@@ -42,8 +42,15 @@ export const uploadToHostinger = async (file: File): Promise<string> => {
         });
 
         if (error) {
-            console.error('Erro no proxy:', error);
-            throw new Error(`Falha no proxy de upload: ${error.message}`);
+            console.error('Erro no proxy (Detalhes):', error);
+            if (typeof error === 'object' && error !== null) {
+                try {
+                     console.error('JSON Error:', JSON.stringify(error, null, 2));
+                } catch (e) {
+                    console.error('Could not stringify error');
+                }
+            }
+            throw new Error(`Falha no proxy: ${error.message || 'Erro desconhecido'}`);
         }
 
         // The proxy returns the Hostinger response
