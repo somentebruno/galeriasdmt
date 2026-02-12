@@ -40,14 +40,12 @@ const AuthView: React.FC = () => {
         <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-6">
             <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl shadow-2xl overflow-hidden border border-slate-100 dark:border-slate-800 animate-in fade-in zoom-in duration-500">
                 <div className="p-8 md:p-12">
-                    <div className="flex flex-col items-center mb-10">
-                        <div className="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center text-white shadow-lg shadow-primary/30 mb-6 rotate-3">
-                            <span className="material-icons text-4xl">filter_vintage</span>
+                    <div className="text-center mb-8">
+                        <div className="flex justify-center mb-4">
+                            <img src="/logo.png" alt="Saúde Digital MT" className="h-20 w-auto object-contain" />
                         </div>
-                        <h1 className="text-3xl font-bold text-slate-800 dark:text-white mb-2">CloudPhotos</h1>
-                        <p className="text-slate-500 dark:text-slate-400 text-center">
-                            {isSignUp ? 'Crie sua conta para começar' : 'Bem-vindo de volta!'}
-                        </p>
+                        <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">Saúde Digital MT</h1>
+                        <p className="text-slate-500 dark:text-slate-400">Entre para acessar a Galeria</p>
                     </div>
 
                     <form onSubmit={handleAuth} className="space-y-5">

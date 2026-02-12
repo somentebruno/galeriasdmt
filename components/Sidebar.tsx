@@ -22,22 +22,25 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onChangeView }) => {
       >
         <img
           src="/logo.png"
-          alt="Governo de Mato Grosso - Saúde Digital"
-          className="w-full h-auto object-contain"
-          style={{ maxHeight: '140px' }} // Allow it to be taller if needed
+          alt="Saúde Digital MT - Galeria"
+          className="h-16 w-auto object-contain cursor-pointer hover:opacity-80 transition-opacity"
           onError={(e) => {
-            e.currentTarget.style.display = 'none'; // Hide broken image
-            e.currentTarget.parentElement?.classList.remove('justify-center'); // Adjust alignment
+            e.currentTarget.style.display = 'none';
+            e.currentTarget.parentElement?.classList.remove('justify-center');
             const fallback = document.getElementById('sidebar-fallback-logo');
             if (fallback) fallback.style.display = 'flex';
           }}
+          onClick={() => onChangeView(ViewState.PHOTOS)}
         />
-        {/* Fallback Text/Icon (Hidden by default, shown on error) */}
-        <div id="sidebar-fallback-logo" style={{ display: 'none' }} className="flex items-center gap-3">
+        <div
+          id="sidebar-fallback-logo"
+          className="hidden items-center gap-2 cursor-pointer"
+          onClick={() => onChangeView(ViewState.PHOTOS)}
+        >
           <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-            <span className="material-icons-outlined text-white text-xl">cloud_queue</span>
+            <span className="material-icons text-white text-xl">cloud</span>
           </div>
-          <h1 className="font-bold text-xl tracking-tight text-slate-800 dark:text-white">CloudPhotos</h1>
+          <span className="font-display font-bold text-xl text-slate-800 dark:text-white">Saúde Digital MT</span>
         </div>
       </div>
 

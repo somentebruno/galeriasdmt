@@ -1,8 +1,8 @@
-# CloudPhotos ☁️
+# Saúde Digital MT - Galeria ☁️
 
 > Uma solução moderna e unificada para gerenciamento de mídia, inspirada na experiência fluida do Google Photos. 
 
-**CloudPhotos** (Galeria SDMT) é uma aplicação de galeria de última geração que centraliza o armazenamento de fotos e vídeos em uma interface intuitiva. O sistema permite o upload direto de arquivos e a integração de vídeos do YouTube, tratando todos os formatos de mídia como cidadãos de primeira classe na experiência do usuário.
+**Saúde Digital MT - Galeria** é uma aplicação de galeria de última geração que centraliza o armazenamento de fotos e vídeos em uma interface intuitiva. O sistema permite o upload direto de arquivos e a integração de vídeos do YouTube, tratando todos os formatos de mídia como cidadãos de primeira classe na experiência do usuário.
 
 ## ✨ Funcionalidades Principais
 
