@@ -62,23 +62,24 @@ const TrashView: React.FC<TrashViewProps> = ({ onPhotoClick, refreshKey, onResto
     const handlePermanentDelete = async (photo: Photo) => {
         if (!confirm('ATENÇÃO: Isso excluirá permanentemente a foto. Não há volta. Continuar?')) return;
         try {
-            // 1. Delete from Storage
-            // Need to extract path from URL or use stored path if mapped
-            // Based on previous code, we might need 'storage_path' from DB.
-            // Let's assume we re-fetch or map it.
-            // For now, let's just delete from DB row to "finish" logic, 
-            // ideally we should delete storage object too.
+            // 1. Delete from Storage if path exists
+            if (photo.storage_path) {
+                const { error: storageError } = await supabase.storage
+                    .from('photos')
+                    .remove([photo.storage_path]);
 
-            /* 
-            const { error: storageError } = await supabase.storage
-              .from('photos')
-              .remove([photo.storage_path]); 
-            */
+                if (storageError) {
+                    console.error('Erro ao deletar do storage:', storageError);
+                    // We continue to delete from DB even if storage fails, or we could stop.
+                    // Usually better to try to clean up DB so we don't have broken links.
+                }
+            }
 
+            // 2. Delete from DB
             const { error: dbError } = await supabase
                 .from('photos')
                 .delete()
-                .eq('url', photo.src);
+                .eq('id', photo.id); // Use ID for safety
 
             if (dbError) throw dbError;
 
@@ -92,12 +93,36 @@ const TrashView: React.FC<TrashViewProps> = ({ onPhotoClick, refreshKey, onResto
     const handleEmptyTrash = async () => {
         if (deletedPhotos.length === 0) return;
 
-        if (!confirm('ATENÇÃO: Você tem certeza que deseja ESVAZIAR a lixeira?\n\nIsso excluirá PERMANENTEMENTE todos os itens. Esta ação não pode ser desfeita.')) {
+        if (!confirm('ATENÇÃO: Você tem certeza que deseja ESVAZIAR a lixeira?\n\nIsso excluirá PERMANENTEMENTE todos os itens e arquivos. Esta ação não pode ser desfeita.')) {
             return;
         }
 
         setLoading(true);
         try {
+            // 1. Fetch all items to be deleted to get their storage paths
+            const { data: itemsToDelete, error: fetchError } = await supabase
+                .from('photos')
+                .select('storage_path')
+                .not('deleted_at', 'is', null);
+
+            if (fetchError) throw fetchError;
+
+            // 2. Extract paths
+            const pathsToDelete = itemsToDelete
+                ?.map(p => p.storage_path)
+                .filter(path => path !== null && path !== '') as string[];
+
+            // 3. Delete from Storage
+            if (pathsToDelete && pathsToDelete.length > 0) {
+                // Supabase storage remove accepts array of strings
+                const { error: storageError } = await supabase.storage
+                    .from('photos')
+                    .remove(pathsToDelete);
+
+                if (storageError) console.error('Erro ao limpar storage:', storageError);
+            }
+
+            // 4. Delete from DB
             const { error } = await supabase
                 .from('photos')
                 .delete()
@@ -105,12 +130,12 @@ const TrashView: React.FC<TrashViewProps> = ({ onPhotoClick, refreshKey, onResto
 
             if (error) throw error;
 
-            alert('Lixeira esvaziada com sucesso!');
+            alert('Lixeira esvaziada e arquivos removidos com sucesso!');
             setDeletedPhotos([]);
-            onRestore?.(); // Refresh global counters if any
+            onRestore?.();
         } catch (error: any) {
             alert('Erro ao esvaziar lixeira: ' + error.message);
-            fetchDeletedPhotos();
+            fetchDeletedPhotos(); // Refresh in case of partial failure
         } finally {
             setLoading(false);
         }

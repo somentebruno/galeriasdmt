@@ -20,6 +20,9 @@ export interface Photo {
   subtitle?: string; // For memories or descriptions
   aspect?: 'wide' | 'tall' | 'square' | 'video';
   views?: number; // Simulated stat
+  storage_path?: string;
+  media_type?: 'image' | 'video';
+  video_id?: string;
 }
 
 export interface Memory {
