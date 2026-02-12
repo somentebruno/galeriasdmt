@@ -3,27 +3,19 @@ import { ViewState } from '../types';
 import Avatar from './UI/Avatar';
 import Button from './UI/Button';
 import { supabase } from '../lib/supabase';
-import UploadForm from './UploadForm';
 
 interface HeaderProps {
   activeView?: ViewState;
   onNavigate?: (view: ViewState) => void;
-  onUploadSuccess?: () => void;
   onSearch?: (term: string) => void;
   searchTerm?: string;
 }
 
-const Header: React.FC<HeaderProps> = ({ activeView, onNavigate, onUploadSuccess, onSearch, searchTerm }) => {
+const Header: React.FC<HeaderProps> = ({ activeView, onNavigate, onSearch, searchTerm }) => {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [showUploadModal, setShowUploadModal] = useState(false);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-  };
-
-  const handleUploadSuccess = () => {
-    setShowUploadModal(false);
-    onUploadSuccess?.();
   };
 
   const getBreadcrumbs = () => {
@@ -70,14 +62,6 @@ const Header: React.FC<HeaderProps> = ({ activeView, onNavigate, onUploadSuccess
 
         <div className="flex items-center gap-2 md:gap-4 ml-4">
 
-          <Button
-            icon="cloud_upload"
-            className="hidden sm:flex"
-            onClick={() => setShowUploadModal(true)}
-          >
-            <span className="hidden lg:inline">Fazer Upload</span>
-          </Button>
-
           <div className="flex items-center gap-1 text-slate-500 dark:text-slate-400">
             <Button variant="ghost" icon="help_outline" />
             <Button variant="ghost" icon="settings" />
@@ -106,16 +90,6 @@ const Header: React.FC<HeaderProps> = ({ activeView, onNavigate, onUploadSuccess
           </div>
         </div>
       </header>
-
-      {/* Upload Modal Overlay */}
-      {showUploadModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in p-4">
-          <UploadForm
-            onSuccess={handleUploadSuccess}
-            onCancel={() => setShowUploadModal(false)}
-          />
-        </div>
-      )}
     </>
   );
 };
