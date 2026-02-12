@@ -11,6 +11,8 @@ import { ViewState, Photo } from './types';
 import { supabase } from './lib/supabase';
 import { User } from '@supabase/supabase-js';
 
+import { cleanupOldTrashItems } from './utils/cleanup';
+
 const App: React.FC = () => {
   const [activeView, setActiveView] = useState<ViewState>(ViewState.PHOTOS);
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
@@ -36,11 +38,19 @@ const App: React.FC = () => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       setLoading(false);
+
+      // Run auto-cleanup if user is logged in
+      if (session?.user) {
+        cleanupOldTrashItems();
+      }
     });
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
+      if (session?.user) {
+        cleanupOldTrashItems();
+      }
     });
 
     return () => subscription.unsubscribe();
