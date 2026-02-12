@@ -2,56 +2,35 @@
  * Utilitário para manipulação de mídia (Upload Hostinger e YouTube)
  */
 
+import { supabase } from '../lib/supabase';
+
 /**
- * Faz upload de uma imagem para o servidor Hostinger.
+ * Faz upload de uma imagem para o Supabase Storage.
  * @param file Arquivo de imagem a ser enviado.
- * @returns Promise com a URL da imagem enviada.
+ * @returns Promise com a URL pública da imagem enviada.
  */
-export const uploadToHostinger = async (file: File): Promise<string> => {
-    const formData = new FormData();
-    formData.append('imagem', file);
-
+export const uploadToSupabase = async (file: File): Promise<string> => {
     try {
-        const response = await fetch('https://saudedigitalfotos.brunolucasdev.com/upload.php', {
-            method: 'POST',
-            headers: {
-                'Authorization': 'bruno_engenheiro_123',
-                // Não definir Content-Type, o browser define automaticamente para multipart/form-data com boundary
-            },
-            body: formData,
-        });
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+        const filePath = `${fileName}`;
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Falha no upload: ${response.statusText} - ${errorText}`);
+        const { error: uploadError, data } = await supabase.storage
+            .from('photos')
+            .upload(filePath, file);
+
+        if (uploadError) {
+            throw uploadError;
         }
 
-        const data = await response.json();
+        const { data: { publicUrl } } = supabase.storage
+            .from('photos')
+            .getPublicUrl(filePath);
 
-        // Assumindo que a API retorna algo como { url: '...' } ou a string direta. 
-        // Ajuste conforme a resposta real da API se necessário.
-        if (data.url) {
-            return data.url;
-        } else if (typeof data === 'string' && data.startsWith('http')) {
-            return data;
-        } else {
-            // Se a resposta for diferente, vamos tentar extrair ou retornar o que veio
-            // Caso a API retorne JSON com erro ou outra estrutura
-            if (data.error) throw new Error(data.error);
-            return data.toString();
-        }
-
+        return publicUrl;
     } catch (error: any) {
-        console.error('Erro detalhado no upload para Hostinger:', error);
-
-        // Verifica se é erro de CORS ou Network
-        if (error.message === 'Failed to fetch') {
-            alert('Erro de conexão ou CORS ao tentar enviar para a Hostinger. Verifique se o servidor PHP aceita requisições deste domínio (localhost) e se o arquivo upload.php está acessível.');
-        } else {
-            alert(`Erro no upload: ${error.message}`);
-        }
-
-        throw error;
+        console.error('Erro detalhado no upload para Supabase:', error);
+        throw new Error(`Falha no upload: ${error.message}`);
     }
 };
 
