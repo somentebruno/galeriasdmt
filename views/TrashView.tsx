@@ -89,6 +89,33 @@ const TrashView: React.FC<TrashViewProps> = ({ onPhotoClick, refreshKey, onResto
         }
     }
 
+    const handleEmptyTrash = async () => {
+        if (deletedPhotos.length === 0) return;
+
+        if (!confirm('ATENÇÃO: Você tem certeza que deseja ESVAZIAR a lixeira?\n\nIsso excluirá PERMANENTEMENTE todos os itens. Esta ação não pode ser desfeita.')) {
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const { error } = await supabase
+                .from('photos')
+                .delete()
+                .not('deleted_at', 'is', null);
+
+            if (error) throw error;
+
+            alert('Lixeira esvaziada com sucesso!');
+            setDeletedPhotos([]);
+            onRestore?.(); // Refresh global counters if any
+        } catch (error: any) {
+            alert('Erro ao esvaziar lixeira: ' + error.message);
+            fetchDeletedPhotos();
+        } finally {
+            setLoading(false);
+        }
+    };
+
     useEffect(() => {
         fetchDeletedPhotos();
     }, [refreshKey]);
@@ -110,16 +137,29 @@ const TrashView: React.FC<TrashViewProps> = ({ onPhotoClick, refreshKey, onResto
 
     return (
         <div className="flex-1 overflow-y-auto px-4 md:px-8 pb-20 custom-scrollbar">
-            <div className="flex items-center gap-4 mb-8 mt-4 sticky top-0 bg-white/95 dark:bg-background-dark/95 py-3 z-[5]">
-                <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/20 flex items-center justify-center text-red-500">
-                    <span className="material-icons">delete</span>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 mt-4 sticky top-0 bg-white/95 dark:bg-background-dark/95 py-3 z-[5]">
+                <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/20 flex items-center justify-center text-red-500">
+                        <span className="material-icons">delete</span>
+                    </div>
+                    <div>
+                        <h3 className="text-xl font-bold text-slate-800 dark:text-white">
+                            {searchTerm ? `Lixeira: Resultados para "${searchTerm}"` : 'Lixeira'}
+                        </h3>
+                        {!searchTerm && <p className="text-sm text-slate-500">Itens na lixeira serão excluídos permanentemente após 30 dias.</p>}
+                    </div>
                 </div>
-                <div>
-                    <h3 className="text-xl font-bold text-slate-800 dark:text-white">
-                        {searchTerm ? `Lixeira: Resultados para "${searchTerm}"` : 'Lixeira'}
-                    </h3>
-                    {!searchTerm && <p className="text-sm text-slate-500">Itens na lixeira serão excluídos permanentemente após 30 dias.</p>}
-                </div>
+
+                {deletedPhotos.length > 0 && !searchTerm && (
+                    <Button
+                        variant="outline"
+                        onClick={handleEmptyTrash}
+                        className="!bg-red-50 !text-red-600 !border-red-200 hover:!bg-red-100 dark:!bg-red-900/10 dark:!text-red-400 dark:!border-red-900/30 whitespace-nowrap self-start md:self-auto"
+                        icon="delete_sweep"
+                    >
+                        Esvaziar Lixeira
+                    </Button>
+                )}
             </div>
 
             {filteredDeletedPhotos.length === 0 ? (
