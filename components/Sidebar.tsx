@@ -44,7 +44,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onChangeView }) => {
         </div>
       </div>
 
-      <nav className="flex-1 px-4 py-2 space-y-1 overflow-y-auto">
+      <nav className="flex-1 px-4 py-2 space-y-1 overflow-y-auto no-scrollbar">
         <button className={navItemClass(ViewState.PHOTOS)} onClick={() => onChangeView(ViewState.PHOTOS)}>
           <span className="material-icons-outlined">image</span>
           Fotos
