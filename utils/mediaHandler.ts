@@ -2,20 +2,19 @@
  * Utilitário para manipulação de mídia (Upload Hostinger e YouTube)
  */
 
-import { supabase } from '../lib/supabase';
 import heic2any from 'heic2any';
 
 /**
- * Faz upload de uma imagem para o Supabase Storage.
- * Converte HEIC para JPEG automaticamente.
+ * Faz upload de uma imagem para o servidor Hostinger via PHP.
+ * Converte HEIC para JPEG automaticamente antes do envio.
  * @param file Arquivo de imagem a ser enviado.
- * @returns Promise com a URL pública da imagem enviada.
+ * @returns Promise com a URL da imagem enviada.
  */
-export const uploadToSupabase = async (file: File): Promise<string> => {
+export const uploadToHostinger = async (file: File): Promise<string> => {
     try {
         let fileToUpload = file;
 
-        // Check for HEIC/HEIF
+        // Converte HEIC para JPEG se necessário
         if (file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif')) {
             console.log('Detectado arquivo HEIC. Convertendo para JPEG...');
             try {
@@ -25,39 +24,44 @@ export const uploadToSupabase = async (file: File): Promise<string> => {
                     quality: 0.8
                 });
 
-                // heic2any can return Blob or Blob[]
                 const blob = Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob;
-
-                // Create new File from Blob
                 const newFileName = file.name.replace(/\.(heic|heif)$/i, '.jpg');
                 fileToUpload = new File([blob], newFileName, { type: 'image/jpeg' });
-                console.log('Conversão concluída:', newFileName);
             } catch (convError) {
                 console.error('Erro na conversão HEIC:', convError);
-                // Fallback: try uploading original if conversion fails, though it won't display
             }
         }
 
-        const fileExt = fileToUpload.name.split('.').pop();
-        const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-        const filePath = `${fileName}`;
+        const formData = new FormData();
+        formData.append('imagem', fileToUpload);
 
-        const { error: uploadError, data } = await supabase.storage
-            .from('photos')
-            .upload(filePath, fileToUpload);
+        const response = await fetch('https://saudedigitalfotos.brunolucasdev.com/upload.php', {
+            method: 'POST',
+            headers: {
+                'Authorization': 'bruno_engenheiro_123',
+            },
+            body: formData,
+        });
 
-        if (uploadError) {
-            throw uploadError;
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Falha no upload Hostinger: ${response.statusText} - ${errorText}`);
         }
 
-        const { data: { publicUrl } } = supabase.storage
-            .from('photos')
-            .getPublicUrl(filePath);
+        const data = await response.json();
 
-        return publicUrl;
+        if (data.url) {
+            return data.url;
+        } else if (typeof data === 'string' && data.startsWith('http')) {
+            return data;
+        } else {
+            if (data.error) throw new Error(data.error);
+            return data.toString();
+        }
+
     } catch (error: any) {
-        console.error('Erro detalhado no upload para Supabase:', error);
-        throw new Error(`Falha no upload: ${error.message}`);
+        console.error('Erro upload Hostinger:', error);
+        throw error;
     }
 };
 

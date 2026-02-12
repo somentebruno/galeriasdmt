@@ -10,13 +10,16 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.95.3",
+    "file-saver": "^2.0.5",
     "heic2any": "^0.0.4",
+    "jszip": "^3.10.1",
     "react": "^19.2.4",
     "react-dom": "^19.2.4"
   },
   "devDependencies": {
     "@tailwindcss/container-queries": "^0.1.1",
     "@tailwindcss/forms": "^0.5.7",
+    "@types/file-saver": "^2.0.7",
     "@types/node": "^25.2.3",
     "@vitejs/plugin-react": "^5.1.4",
     "autoprefixer": "^10.4.17",

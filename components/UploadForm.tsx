@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { uploadToSupabase, getYoutubeID } from '../utils/mediaHandler';
+import { uploadToHostinger, getYoutubeID } from '../utils/mediaHandler';
 import Button from './UI/Button';
 
 interface UploadFormProps {
@@ -65,8 +65,8 @@ const UploadForm: React.FC<UploadFormProps> = ({ onSuccess, onCancel }) => {
             setFiles([...newFiles]);
 
             try {
-                // 1. Upload File
-                const url = await uploadToSupabase(newFiles[i].file);
+                // 1. Upload File to Hostinger
+                const url = await uploadToHostinger(newFiles[i].file);
 
                 // 2. Save to DB
                 // Use filename as title, remove extension
@@ -74,10 +74,9 @@ const UploadForm: React.FC<UploadFormProps> = ({ onSuccess, onCancel }) => {
                 // Random aspect for demo variation
                 const aspect = Math.random() > 0.5 ? 'wide' : 'square';
 
-                // Extract storage path from URL for future deletions
-                // Standard public URL: .../storage/v1/object/public/photos/filename.ext
-                // We stored as just "filename.ext" in root of bucket.
-                const storagePath = url.split('/').pop();
+                // For Hostinger, we don't have a storage_path in the same sense as Supabase Storage
+                // The URL is external. We can leave storage_path null or store the filename if we had a way to delete from Hostinger (we possibly don't via API yet)
+                // For now, let's leave storage_path null for Hostinger uploads.
 
                 const { error: dbError } = await supabase
                     .from('photos')
@@ -87,7 +86,7 @@ const UploadForm: React.FC<UploadFormProps> = ({ onSuccess, onCancel }) => {
                         title: title,
                         media_type: 'image',
                         aspect: aspect,
-                        storage_path: storagePath
+                        storage_path: null // Hostinger upload
                     });
 
                 if (dbError) throw dbError;

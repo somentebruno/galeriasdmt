@@ -2,9 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { Photo, Memory } from '../types';
 import Section from '../components/UI/Section';
 import { supabase } from '../lib/supabase';
+import JSZip from 'jszip';
+import { saveAs } from 'file-saver';
+import Button from '../components/UI/Button';
 
 interface PhotosViewProps {
   onPhotoClick: (photo: Photo) => void;
+  refreshKey?: number;
+  searchTerm?: string;
 }
 
 const MEMORIES: Memory[] = [
@@ -34,6 +39,9 @@ const YESTERDAY_PHOTOS: Photo[] = [
 const PhotosView: React.FC<PhotosViewProps> = ({ onPhotoClick, refreshKey, searchTerm }) => {
   const [uploadedPhotos, setUploadedPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const fetchPhotos = async () => {
     try {
@@ -75,8 +83,126 @@ const PhotosView: React.FC<PhotosViewProps> = ({ onPhotoClick, refreshKey, searc
     return title.includes(term) || desc.includes(term);
   });
 
+  const toggleSelection = (id: string) => {
+    setSelectedIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  };
+
+  const selectAll = () => {
+    const allIds = filteredPhotos.map(p => p.id);
+    setSelectedIds(new Set(allIds));
+  };
+
+  const clearSelection = () => {
+    setSelectedIds(new Set());
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`Deseja mover ${selectedIds.size} itens para a lixeira?`)) return;
+
+    setIsProcessing(true);
+    try {
+      const { error } = await supabase
+        .from('photos')
+        .update({ deleted_at: new Date().toISOString() })
+        .in('id', Array.from(selectedIds));
+
+      if (error) throw error;
+
+      alert(`${selectedIds.size} itens movidos para a lixeira.`);
+      setIsSelectionMode(false);
+      setSelectedIds(new Set());
+      fetchPhotos();
+    } catch (error: any) {
+      alert('Erro ao excluir itens: ' + error.message);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleBulkDownload = async () => {
+    if (selectedIds.size === 0) return;
+
+    setIsProcessing(true);
+    try {
+      const zip = new JSZip();
+      const selectedPhotos = filteredPhotos.filter(p => selectedIds.has(p.id));
+
+      const downloadPromises = selectedPhotos.map(async (photo) => {
+        try {
+          const response = await fetch(photo.src);
+          const blob = await response.blob();
+          const cleanTitle = (photo.title || 'foto').replace(/[^a-z0-9]/gi, '_').toLowerCase();
+          const fileName = `${cleanTitle}_${photo.id}.jpg`;
+          zip.file(fileName, blob);
+        } catch (err) {
+          console.error(`Erro ao baixar ${photo.src}:`, err);
+        }
+      });
+
+      await Promise.all(downloadPromises);
+
+      const content = await zip.generateAsync({ type: 'blob' });
+      saveAs(content, 'fotos_selecionadas.zip');
+    } catch (error: any) {
+      alert('Erro ao gerar arquivo ZIP: ' + error.message);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   return (
-    <div className="flex-1 overflow-y-auto px-4 md:px-8 pb-20 custom-scrollbar">
+    <div className="flex-1 overflow-y-auto px-4 md:px-8 pb-20 custom-scrollbar relative">
+      {/* Floating Selection Toolbar */}
+      {isSelectionMode && (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 bg-white dark:bg-slate-800 shadow-2xl rounded-2xl border border-slate-100 dark:border-slate-700 p-2 flex items-center gap-2 animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <div className="px-4 border-r border-slate-100 dark:border-slate-700 mr-2 flex flex-col items-center">
+            <span className="text-sm font-bold text-primary">{selectedIds.size}</span>
+            <span className="text-[10px] text-slate-400 uppercase font-medium">Selecionados</span>
+          </div>
+
+          <Button variant="ghost" size="sm" onClick={selectAll} icon="done_all" className="hidden md:flex">Tudo</Button>
+          <Button variant="ghost" size="sm" onClick={clearSelection} icon="close">Limpar</Button>
+
+          <div className="w-px h-8 bg-slate-100 dark:bg-slate-700 mx-1"></div>
+
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={handleBulkDownload}
+            disabled={selectedIds.size === 0 || isProcessing}
+            icon={isProcessing ? 'sync' : 'download'}
+            className={isProcessing ? 'animate-pulse' : ''}
+          >
+            Baixar
+          </Button>
+
+          <Button
+            variant="danger"
+            size="sm"
+            onClick={handleBulkDelete}
+            disabled={selectedIds.size === 0 || isProcessing}
+            icon="delete"
+          >
+            Excluir
+          </Button>
+
+          <button
+            onClick={() => { setIsSelectionMode(false); setSelectedIds(new Set()); }}
+            className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 ml-2"
+          >
+            <span className="material-icons">close</span>
+          </button>
+        </div>
+      )}
       {/* Memories Section - Only show when not searching or optional? Let's hide memories when searching to focus on results */}
       {!searchTerm && (
         <Section
@@ -116,36 +242,72 @@ const PhotosView: React.FC<PhotosViewProps> = ({ onPhotoClick, refreshKey, searc
               {searchTerm ? `Resultados para "${searchTerm}"` : 'Sua Galeria Unificada'}
             </h3>
             <div className="h-px flex-1 bg-slate-100 dark:bg-slate-800"></div>
+
+            <button
+              onClick={() => setIsSelectionMode(!isSelectionMode)}
+              className={`p-1.5 rounded-lg transition-colors flex items-center gap-2 border ${isSelectionMode
+                ? 'bg-primary/10 border-primary text-primary'
+                : 'text-slate-400 border-transparent hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+            >
+              <span className="material-icons-outlined text-xl">{isSelectionMode ? 'check_circle' : 'library_add_check'}</span>
+              <span className="text-xs font-medium hidden md:block">{isSelectionMode ? 'Concluir Seleção' : 'Selecionar'}</span>
+            </button>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 auto-rows-[200px]">
             {filteredPhotos.map((photo: any) => (
               <div
                 key={photo.id}
-                onClick={() => onPhotoClick(photo)}
-                className={`rounded-lg overflow-hidden group relative cursor-pointer bg-slate-100 dark:bg-slate-800 flex items-center justify-center ${photo.media_type === 'video' ? 'col-span-2 row-span-2 md:col-span-1 md:row-span-1 lg:col-span-2 lg:row-span-2 aspect-video' : ''
+                onClick={() => {
+                  if (isSelectionMode) {
+                    toggleSelection(photo.id);
+                  } else {
+                    onPhotoClick(photo);
+                  }
+                }}
+                className={`rounded-lg overflow-hidden group relative cursor-pointer bg-slate-100 dark:bg-slate-800 flex items-center justify-center transition-all ${isSelectionMode && selectedIds.has(photo.id) ? 'ring-4 ring-primary ring-inset' : ''
+                  } ${photo.media_type === 'video' ? 'col-span-2 row-span-2 md:col-span-1 md:row-span-1 lg:col-span-2 lg:row-span-2 aspect-video' : ''
                   }`}
               >
                 <img
                   src={photo.src}
                   alt={photo.alt || photo.title}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                  className={`w-full h-full object-cover transition-transform duration-700 ${isSelectionMode ? '' : 'group-hover:scale-105'
+                    }`}
                   onError={(e) => {
                     (e.target as HTMLImageElement).src = 'https://via.placeholder.com/400x400?text=Imagem+N%C3%A3o+Encontrada';
                   }}
                 />
 
-                {/* Gradient Overlay for Text */}
-                <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
-                  <p className="text-white text-xs font-medium truncate">{photo.title}</p>
-                </div>
-
-                {/* Video Play Icon Overlay */}
-                {photo.media_type === 'video' && (
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="bg-black/30 backdrop-blur-sm p-3 rounded-full flex items-center justify-center group-hover:bg-primary/80 transition-colors">
-                      <span className="material-icons text-white text-3xl">play_arrow</span>
-                    </div>
+                {/* Selection Checkbox (always visible in selection mode, or on hover) */}
+                {isSelectionMode && (
+                  <div className={`absolute top-3 left-3 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${selectedIds.has(photo.id) ? 'bg-primary border-primary' : 'bg-black/20 border-white'
+                    }`}>
+                    {selectedIds.has(photo.id) && <span className="material-icons text-white text-[16px]">check</span>}
                   </div>
+                )}
+
+                {!isSelectionMode && (
+                  <>
+                    {/* Gradient Overlay for Text */}
+                    <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+                      <p className="text-white text-xs font-medium truncate">{photo.title}</p>
+                    </div>
+
+                    {/* Video Play Icon Overlay */}
+                    {photo.media_type === 'video' && (
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <div className="bg-black/30 backdrop-blur-sm p-3 rounded-full flex items-center justify-center group-hover:bg-primary/80 transition-colors">
+                          <span className="material-icons text-white text-3xl">play_arrow</span>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* Selection Overlay */}
+                {isSelectionMode && !selectedIds.has(photo.id) && (
+                  <div className="absolute inset-0 bg-black/5 opacity-0 hover:opacity-100 transition-opacity"></div>
                 )}
               </div>
             ))}
