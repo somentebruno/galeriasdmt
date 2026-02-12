@@ -3,21 +3,48 @@
  */
 
 import { supabase } from '../lib/supabase';
+import heic2any from 'heic2any';
 
 /**
  * Faz upload de uma imagem para o Supabase Storage.
+ * Converte HEIC para JPEG automaticamente.
  * @param file Arquivo de imagem a ser enviado.
  * @returns Promise com a URL pública da imagem enviada.
  */
 export const uploadToSupabase = async (file: File): Promise<string> => {
     try {
-        const fileExt = file.name.split('.').pop();
+        let fileToUpload = file;
+
+        // Check for HEIC/HEIF
+        if (file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif')) {
+            console.log('Detectado arquivo HEIC. Convertendo para JPEG...');
+            try {
+                const convertedBlob = await heic2any({
+                    blob: file,
+                    toType: 'image/jpeg',
+                    quality: 0.8
+                });
+
+                // heic2any can return Blob or Blob[]
+                const blob = Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob;
+
+                // Create new File from Blob
+                const newFileName = file.name.replace(/\.(heic|heif)$/i, '.jpg');
+                fileToUpload = new File([blob], newFileName, { type: 'image/jpeg' });
+                console.log('Conversão concluída:', newFileName);
+            } catch (convError) {
+                console.error('Erro na conversão HEIC:', convError);
+                // Fallback: try uploading original if conversion fails, though it won't display
+            }
+        }
+
+        const fileExt = fileToUpload.name.split('.').pop();
         const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
         const filePath = `${fileName}`;
 
         const { error: uploadError, data } = await supabase.storage
             .from('photos')
-            .upload(filePath, file);
+            .upload(filePath, fileToUpload);
 
         if (uploadError) {
             throw uploadError;
