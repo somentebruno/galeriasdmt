@@ -8,7 +8,7 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ activeView, onChangeView }) => {
   const navItemClass = (view: ViewState) =>
-    `flex items-center gap-4 px-4 py-3 rounded-full transition-colors cursor-pointer ${activeView === view
+    `flex items-center gap-3 px-4 py-2 rounded-full transition-colors cursor-pointer ${activeView === view
       ? 'bg-primary/10 text-primary font-semibold'
       : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
     }`;
@@ -58,7 +58,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onChangeView }) => {
           Compartilhamento
         </button>
 
-        <div className="pt-6 pb-2 px-4">
+        <div className="pt-3 pb-2 px-4">
           <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Biblioteca</p>
         </div>
 
@@ -84,7 +84,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onChangeView }) => {
         </button>
       </nav>
 
-      <div className="p-6 border-t border-slate-200 dark:border-slate-800">
+      <div className="p-4 border-t border-slate-200 dark:border-slate-800">
         <div className="flex items-center justify-between text-sm mb-2">
           <span className="font-medium text-slate-700 dark:text-slate-300">Armazenamento</span>
           <span className="text-slate-500">15 GB de 100 GB</span>
