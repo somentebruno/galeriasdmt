@@ -3,9 +3,10 @@
  */
 
 import heic2any from 'heic2any';
+import { supabase } from '../lib/supabase';
 
 /**
- * Faz upload de uma imagem para o servidor Hostinger via PHP.
+ * Faz upload de uma imagem para o servidor Hostinger via proxy Supabase Edge Function.
  * Converte HEIC para JPEG automaticamente antes do envio.
  * @param file Arquivo de imagem a ser enviado.
  * @returns Promise com a URL da imagem enviada.
@@ -34,20 +35,18 @@ export const uploadToHostinger = async (file: File): Promise<string> => {
 
         const formData = new FormData();
         formData.append('imagem', fileToUpload);
-        formData.append('token', 'bruno_engenheiro_123'); // Send token in body to avoid CORS preflight
 
-        const response = await fetch('https://saudedigitalfotos.brunolucasdev.com/upload.php', {
-            method: 'POST',
+        console.log('Enviando via proxy hostinger-proxy...');
+        const { data, error } = await supabase.functions.invoke('hostinger-proxy', {
             body: formData,
         });
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Falha no upload Hostinger: ${response.statusText} - ${errorText}`);
+        if (error) {
+            console.error('Erro no proxy:', error);
+            throw new Error(`Falha no proxy de upload: ${error.message}`);
         }
 
-        const data = await response.json();
-
+        // The proxy returns the Hostinger response
         if (data.url) {
             return data.url;
         } else if (typeof data === 'string' && data.startsWith('http')) {
