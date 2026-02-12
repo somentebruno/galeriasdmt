@@ -41,11 +41,10 @@ const AuthView: React.FC = () => {
             <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl shadow-2xl overflow-hidden border border-slate-100 dark:border-slate-800 animate-in fade-in zoom-in duration-500">
                 <div className="p-8 md:p-12">
                     <div className="text-center mb-8">
-                        <div className="flex justify-center mb-4">
-                            <img src="/logo.png" alt="Saúde Digital MT" className="h-20 w-auto object-contain" />
+                        <div className="flex justify-center mb-6">
+                            <img src="/logo.png" alt="Saúde Digital MT" className="h-32 w-auto object-contain" />
                         </div>
-                        <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">Saúde Digital MT</h1>
-                        <p className="text-slate-500 dark:text-slate-400">Entre para acessar a Galeria</p>
+                        <p className="text-slate-500 dark:text-slate-400 text-lg">Entre para acessar a Galeria</p>
                     </div>
 
                     <form onSubmit={handleAuth} className="space-y-5">
