@@ -34,12 +34,10 @@ export const uploadToHostinger = async (file: File): Promise<string> => {
 
         const formData = new FormData();
         formData.append('imagem', fileToUpload);
+        formData.append('token', 'bruno_engenheiro_123'); // Send token in body to avoid CORS preflight
 
         const response = await fetch('https://saudedigitalfotos.brunolucasdev.com/upload.php', {
             method: 'POST',
-            headers: {
-                'Authorization': 'bruno_engenheiro_123',
-            },
             body: formData,
         });
 
