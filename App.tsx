@@ -34,6 +34,17 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
+    // SECURITY AUDIT: Verify environment configuration
+    const url = import.meta.env.VITE_SUPABASE_URL;
+    const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    
+    if (!url || !key) {
+      alert(`⚠️ CONFIGURATION ERROR ⚠️\n\nSupabase Keys are MISSING!\n\nURL: ${url ? 'OK' : 'MISSING'}\nKEY: ${key ? 'OK' : 'MISSING'}\n\nIf you are running online, add these to your Hosting Dashboard (Environment Variables). .env file is NOT uploaded via git.`);
+    } else {
+       // Optional: Notify success (can remove later)
+       // console.log("Configuration OK");
+    }
+
     // Check active session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
