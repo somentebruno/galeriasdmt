@@ -13,11 +13,11 @@ interface PhotosViewProps {
 }
 
 const MEMORIES: Memory[] = [
-  { id: 'm1', src: "https://lh3.googleusercontent.com/aida-public/AB6AXuBdqsg-MyQw9iJxnoQqOyD1iCoiPb07APcgZ-jnG-VNnlJb8_HnZsjFishZs6gh--bruWKPSNz7zcLQ4DsIeYbrrLZLxGr0gR8qsSLpfaegzC2c3q8En_xFBvNFNvzN13LKNXixlR0n8SdVlB0Cze_z5zeGiZFBlbhMJrWIs8SQMovqtZjUS_-3nvBdBvrolJJV9wmjH736OpF2m8qaKg-lAQwikq-UUIRcD-mgKH6QVOTDwhh2N2JsFYQDCOV0COiNltZWhxhAbTw", subtitle: "1 ano atrás", title: "Inverno nos Alpes" },
-  { id: 'm2', src: "https://lh3.googleusercontent.com/aida-public/AB6AXuAavCr7qxIjnAFHY7meeXLxL3hSvVeQx2YdYLhD-f1xptfC7OMGRke2kfmZCi4V7mCaHuDn2-xuh6f06gzTrVhduUa4UmyYx2OV9FNV-QjfRwM-uIigzgzL0eImxfiBP1PegMqMrMpumKMMGSmOO3OcF5PCz7rCMGNO14xG4E1KZZRGcQYkQDqugDAN_7ECFC6-qr7mEqOflqzywAA-7W-5_IEO6k5w2-fryoRxAyBFPBZ5yoPSqe93msrDp_S3wlliPwwulC3_d-I", subtitle: "3 anos atrás", title: "Férias de Verão" },
-  { id: 'm3', src: "https://lh3.googleusercontent.com/aida-public/AB6AXuB1rAacIoYGuMQEUDCS2EOSwQlfI8abE8-b1kqU4MnAuaRsPP_BwUn4I0w6gMk-mnSHmQo_EoMHfEHiR4QH33w-9figZ8lTC5hYFSZI5r4XaUIK0vQPDtL-5UeGzt_EFzOQdrdL1KXrooT_vThT5fzN73Qnd0Y0hxxN6L8tRKXBxb_FFIr174X_hZNkbHvjODzmxmIePA-vpp58MwTrPL6aqwZieLnjCSD7fcGYSe5xw42OTeGzZsrY1r7jnjNhWJxM9HWxYHoNo_Q", subtitle: "Outubro passado", title: "Jantar com Amigos" },
-  { id: 'm4', src: "https://lh3.googleusercontent.com/aida-public/AB6AXuAziX87AxObnM-Q9ET4Vpa76k77-4mEHofbpuFE90DVZinEduPHzEOkt631O4t3DnBupnnMrKaPz_Jz-ojNEa6LkGFGv9htJMnlX6KyrSNVt1wv86YyNlARNJsJHn5yFmXKqImJsTFq6s6-OlgKp92KitaifAYc4wN5PM3y_bGuEbnWWCyCXreG9f2BNEnV3vGEbzflAq8VAmvcseGD5jJZDerpUn_ruEgvbaKDqq0KWD9fi1YKAf0dj-NwlS4ce9XDr0Wuqqp7Nlo", subtitle: "5 anos atrás", title: "Viagem para São Francisco" },
-  { id: 'm5', src: "https://lh3.googleusercontent.com/aida-public/AB6AXuCNcMQNcm8n1frBcR7nC78WRtviXv7qMPcTL5o4y62wCoQ61kedQSlrQtvif-C5KkvhtqjkI0EeoUDy6gCOd1hDG4BMtUfhh5wgfBdf2d5G0RyIZIxuz-SZ7lJRBQ5eMTNb5AVaeGZY7YpTLhrCz9n8ecqrdxAEe827AMVmXPgz03vTLahMbjDj41HptB7PlCedIC1leTw4kp_p6uwUayV8iSJKPLgvaXm9VM6AUCK4hrjElSlCdnM91S7U_9yHAW4GTcMihdeucw4", subtitle: "Destaque", title: "Noites em Paris" },
+  { id: 'm1', src: "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=500&q=60", subtitle: "Conectando Vidas", title: "Telemedicina Rural" },
+  { id: 'm2', src: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=500&q=60", subtitle: "Gestão Inteligente", title: "Monitoramento em Tempo Real" },
+  { id: 'm3', src: "https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&w=500&q=60", subtitle: "Cuiabá", title: "Hospital Digital" },
+  { id: 'm4', src: "https://images.unsplash.com/photo-1576091160550-217358c7e618?auto=format&fit=crop&w=500&q=60", subtitle: "Inovação", title: "Tecnologia e Cuidado" },
+  { id: 'm5', src: "https://images.unsplash.com/photo-1581056771107-24ca5f033842?auto=format&fit=crop&w=500&q=60", subtitle: "Humanização", title: "Equipe Multidisciplinar" },
 ];
 
 const TODAY_PHOTOS: Photo[] = [
