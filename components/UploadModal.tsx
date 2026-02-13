@@ -50,7 +50,8 @@ const UploadModal: React.FC<UploadModalProps> = ({ onClose, onSuccess }) => {
             'image/jpeg': [],
             'image/png': [],
             'image/webp': [],
-            'image/heic': [] // Explicitly accept HEIC
+            'image/heic': ['.heic'],
+            'image/heif': ['.heif']
         }
     });
 
@@ -84,18 +85,28 @@ const UploadModal: React.FC<UploadModalProps> = ({ onClose, onSuccess }) => {
 
             try {
                 // 1. Convert HEIC if needed
-                if (fileToUpload.name.toLowerCase().endsWith('.heic')) {
+                const isHeic = fileToUpload.name.toLowerCase().endsWith('.heic') || 
+                               fileToUpload.name.toLowerCase().endsWith('.heif') ||
+                               fileToUpload.type === 'image/heic' ||
+                               fileToUpload.type === 'image/heif';
+
+                if (isHeic) {
                     newFiles[i].status = 'converting';
                     setFiles([...newFiles]);
                     
-                    const convertedBlob = await heic2any({
-                        blob: fileToUpload,
-                        toType: 'image/jpeg',
-                        quality: 0.8
-                    });
+                    try {
+                        const convertedBlob = await heic2any({
+                            blob: fileToUpload,
+                            toType: 'image/jpeg',
+                            quality: 0.8
+                        });
 
-                    const conversionResult = Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob;
-                    fileToUpload = new File([conversionResult], originalName.replace(/\.heic$/i, '.jpg'), { type: 'image/jpeg' });
+                        const conversionResult = Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob;
+                        fileToUpload = new File([conversionResult], originalName.replace(/\.(heic|heif)$/i, '.jpg'), { type: 'image/jpeg' });
+                    } catch (convErr: any) {
+                        console.error('HEIC Conversion error:', convErr);
+                        throw new Error(`Falha ao converter HEIC: ${convErr.message || 'Formato não suportado'}`);
+                    }
                 }
 
                 // 2. Upload to Hostinger

@@ -21,8 +21,18 @@ export const uploadToHostinger = async (file: File): Promise<string> => {
         });
 
         if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.mensagem || `Erro no servidor: ${response.status}`);
+            let errorMessage = `Erro no servidor: ${response.status}`;
+            try {
+                const errorData = await response.json();
+                errorMessage = errorData.mensagem || errorMessage;
+            } catch (e) {
+                // If not JSON, try text
+                const text = await response.text().catch(() => '');
+                if (text.includes('403 Forbidden')) {
+                    errorMessage = "Acesso Negado (403): O servidor Hostinger bloqueou a requisição. Verifique o .htaccess ou ModSecurity.";
+                }
+            }
+            throw new Error(errorMessage);
         }
 
         const data = await response.json();
