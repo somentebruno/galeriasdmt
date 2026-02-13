@@ -1,5 +1,5 @@
 /**
- * Uploads a file using string reversal obfuscation to bypass strict firewalls (403).
+ * Uploads a file using JSON + String Reversal to bypass strict WAF filters.
  */
 export const uploadToHostinger = async (file: File): Promise<string> => {
     try {
@@ -10,27 +10,26 @@ export const uploadToHostinger = async (file: File): Promise<string> => {
             reader.onerror = error => reject(error);
         });
 
-        // Remove prefix 'data:image/...;base64,'
         const base64 = base64Full.split(',')[1];
-        
-        // Obfuscation: Reverse the string so the firewall doesn't recognize image headers
         const reversed = base64.split('').reverse().join('');
-
-        const body = new URLSearchParams();
-        body.append('a', 'bruno_engenheiro_123'); // auth
-        body.append('d', reversed);               // data
-        body.append('n', file.name);               // name
 
         const response = await fetch('https://saudedigitalfotos.brunolucasdev.com/galeria.php', {
             method: 'POST',
-            body: body,
+            body: JSON.stringify({
+                a: 'bruno_engenheiro_123',
+                d: reversed,
+                n: file.name
+            }),
             headers: {
-                'Content-Type': 'application/x-www-form-urlencoded'
+                'Content-Type': 'application/json'
             }
         });
 
         if (!response.ok) {
-            throw new Error(`Acesso negado pelo servidor (403). Verifique o ModSecurity no painel da Hostinger.`);
+           if (response.status === 403) {
+               throw new Error('O Firewall da Hostinger bloqueou o envio. Tente fotos menores ou verifique o arquivo galeria.php.');
+           }
+           throw new Error(`Erro no servidor (Status: ${response.status})`);
         }
 
         const data = await response.json();
