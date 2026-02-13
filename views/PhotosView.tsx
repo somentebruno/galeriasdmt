@@ -211,7 +211,7 @@ const PhotosView: React.FC<PhotosViewProps> = ({ onPhotoClick, refreshKey, searc
           onActionClick={() => { }}
           className="mt-4"
         >
-          <div className="flex gap-6 overflow-x-auto pb-4 no-scrollbar">
+          <div className="flex gap-6 overflow-x-auto pb-4 custom-scrollbar">
             {MEMORIES.map((memory) => (
               <div
                 key={memory.id}
