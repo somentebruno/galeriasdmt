@@ -7,7 +7,7 @@ import { supabase } from '../lib/supabase';
  */
 export const uploadToHostinger = async (file: File): Promise<string> => {
     try {
-        // Convert file to Base64 to bypass firewall blocks on binary multipart/form-data
+        // Convert file to Base64
         const base64 = await new Promise<string>((resolve, reject) => {
             const reader = new FileReader();
             reader.readAsDataURL(file);
@@ -15,15 +15,18 @@ export const uploadToHostinger = async (file: File): Promise<string> => {
             reader.onerror = error => reject(error);
         });
 
+        // Use URLSearchParams to simulate a standard text form POST
+        const body = new URLSearchParams();
+        body.append('chave', 'bruno_engenheiro_123');
+        body.append('imagem', base64);
+        body.append('nome', file.name);
+        
         const response = await fetch('https://saudedigitalfotos.brunolucasdev.com/upload.php', {
             method: 'POST',
-            body: JSON.stringify({
-                chave: 'bruno_engenheiro_123',
-                imagem: base64,
-                nome: file.name
-            }),
+            body: body,
             headers: {
-                'Content-Type': 'application/json'
+                // DO NOT set any other headers, URLSearchParams sets the correct content-type automatically
+                'Content-Type': 'application/x-www-form-urlencoded'
             }
         });
 
