@@ -94,21 +94,18 @@ const UploadModal: React.FC<UploadModalProps> = ({ onClose, onSuccess }) => {
                     setFiles([...newFiles]);
                     
                     try {
-                        // Ensure we have a valid blob
-                        const blob = fileToUpload.slice(0, fileToUpload.size, fileToUpload.type);
                         const convertedBlob = await heic2any({
-                            blob: blob,
+                            blob: fileToUpload,
                             toType: 'image/jpeg',
-                            quality: 0.7 // Slightly lower quality for better compatibility
+                            quality: 0.6 // Lower quality slightly for better conversion success
                         });
 
                         const result = Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob;
                         fileToUpload = new File([result], originalName.replace(/\.(heic|heif)$/i, '.jpg'), { type: 'image/jpeg' });
                     } catch (convErr: any) {
-                        console.error('HEIC Error:', convErr);
-                        // If conversion fails, we'll try to upload the original file anyway, 
-                        // maybe the server can handle it or the user can see the error
-                        throw new Error(`Não foi possível converter esta foto do iPhone (HEIC). Tente converter para JPG antes de subir.`);
+                        console.error('HEIC conversion failed:', convErr);
+                        // Se falhar a conversão, vamos apenas avisar mas permitir que o usuário saiba o que ocorreu
+                        throw new Error(`O arquivo HEIC (iPhone) parece estar em um formato protegido ou incompatível. Tente salvar como JPG no celular.`);
                     }
                 }
 
