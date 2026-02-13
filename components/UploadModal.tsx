@@ -87,25 +87,27 @@ const UploadModal: React.FC<UploadModalProps> = ({ onClose, onSuccess }) => {
             try {
                 // 1. Convert HEIC/HEIF if needed
                 const fileName = fileToUpload.name.toLowerCase();
-                const isHeic = fileName.endsWith('.heic') || fileName.endsWith('.heif') || fileToUpload.type === 'image/heic' || fileToUpload.type === 'image/heif';
+                const isHeic = fileName.endsWith('.heic') || fileName.endsWith('.heif') || fileToUpload.type.includes('heic') || fileToUpload.type.includes('heif');
 
                 if (isHeic) {
                     newFiles[i].status = 'converting';
                     setFiles([...newFiles]);
                     
                     try {
+                        // Ensure we use a clean blob for heic2any
+                        const buffer = await fileToUpload.arrayBuffer();
+                        const blob = new Blob([buffer], { type: fileToUpload.type });
                         const convertedBlob = await heic2any({
-                            blob: fileToUpload,
+                            blob: blob,
                             toType: 'image/jpeg',
-                            quality: 0.6 // Lower quality slightly for better conversion success
+                            quality: 0.6
                         });
 
                         const result = Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob;
                         fileToUpload = new File([result], originalName.replace(/\.(heic|heif)$/i, '.jpg'), { type: 'image/jpeg' });
                     } catch (convErr: any) {
                         console.error('HEIC conversion failed:', convErr);
-                        // Se falhar a conversão, vamos apenas avisar mas permitir que o usuário saiba o que ocorreu
-                        throw new Error(`O arquivo HEIC (iPhone) parece estar em um formato protegido ou incompatível. Tente salvar como JPG no celular.`);
+                        throw new Error(`O arquivo HEIC é incompatível. Tente converter para JPG no celular antes de subir.`);
                     }
                 }
 

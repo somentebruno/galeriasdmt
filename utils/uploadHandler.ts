@@ -7,17 +7,23 @@ import { supabase } from '../lib/supabase';
  */
 export const uploadToHostinger = async (file: File): Promise<string> => {
     try {
-        const formData = new FormData();
-        formData.append('imagem', file);
-        // Envia a chave via POST (Backup contra firewall)
-        formData.append('chave', 'bruno_engenheiro_123');
-        
+        // Convert file to Base64 to bypass firewall blocks on binary multipart/form-data
+        const base64 = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = error => reject(error);
+        });
+
         const response = await fetch('https://saudedigitalfotos.brunolucasdev.com/upload.php', {
             method: 'POST',
-            body: formData,
+            body: JSON.stringify({
+                chave: 'bruno_engenheiro_123',
+                imagem: base64,
+                nome: file.name
+            }),
             headers: {
-                // Envia a chave via Header (Padrão)
-                'Authorization': 'bruno_engenheiro_123'
+                'Content-Type': 'application/json'
             }
         });
 
