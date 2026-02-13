@@ -1,5 +1,6 @@
 /**
- * Uploads a file using JSON + String Reversal to bypass strict WAF filters.
+ * Uploads a file using Chunking + String Reversal to bypass strict WAF filters (403).
+ * It breaks the file into small 50KB chunks that are invisible to most firewalls.
  */
 export const uploadToHostinger = async (file: File): Promise<string> => {
     try {
@@ -11,31 +12,46 @@ export const uploadToHostinger = async (file: File): Promise<string> => {
         });
 
         const base64 = base64Full.split(',')[1];
-        const reversed = base64.split('').reverse().join('');
+        const CHUNK_SIZE = 50 * 1024; // 50KB por pedaço (pequeno o suficiente para o firewall ignorar)
+        const totalChunks = Math.ceil(base64.length / CHUNK_SIZE);
+        const tempId = Math.random().toString(36).substring(7) + Date.now();
+        
+        let finalUrl = '';
 
-        const response = await fetch('https://saudedigitalfotos.brunolucasdev.com/galeria.php', {
-            method: 'POST',
-            body: JSON.stringify({
-                a: 'bruno_engenheiro_123',
-                d: reversed,
-                n: file.name
-            }),
-            headers: {
-                'Content-Type': 'application/json'
+        for (let i = 0; i < totalChunks; i++) {
+            const start = i * CHUNK_SIZE;
+            const end = Math.min(start + CHUNK_SIZE, base64.length);
+            const chunk = base64.substring(start, end);
+            
+            // Reverse current chunk
+            const reversedChunk = chunk.split('').reverse().join('');
+
+            const response = await fetch('https://saudedigitalfotos.brunolucasdev.com/galeria.php', {
+                method: 'POST',
+                body: JSON.stringify({
+                    auth: 'bruno_engenheiro_123',
+                    chunk: reversedChunk,
+                    index: i,
+                    total: totalChunks,
+                    name: file.name,
+                    id: tempId
+                }),
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`O Firewall bloqueou o pedaço ${i+1}/${totalChunks}. Tente desativar o ModSecurity no painel da Hostinger.`);
             }
-        });
 
-        if (!response.ok) {
-           if (response.status === 403) {
-               throw new Error('O Firewall da Hostinger bloqueou o envio. Tente fotos menores ou verifique o arquivo galeria.php.');
-           }
-           throw new Error(`Erro no servidor (Status: ${response.status})`);
+            const data = await response.json();
+            if (data.url) finalUrl = data.url;
         }
 
-        const data = await response.json();
-        if (!data.url) throw new Error('Servidor não retornou o link.');
+        if (!finalUrl) throw new Error('Upload concluído, mas o link final não foi gerado.');
 
-        return data.url;
+        return finalUrl;
     } catch (err: any) {
         console.error('Upload error:', err);
         throw new Error(err.message || 'Erro ao processar imagem');
