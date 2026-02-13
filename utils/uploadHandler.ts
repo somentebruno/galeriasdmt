@@ -1,50 +1,38 @@
-import { supabase } from '../lib/supabase';
-
 /**
- * Uploads a file via Supabase Edge Function which handles FTP to Hostinger.
+ * Uploads a file to Hostinger using a stealthy JSON/Base64 method to bypass firewalls.
  */
 export const uploadToHostinger = async (file: File): Promise<string> => {
     try {
-        const formData = new FormData();
-        formData.append('file', file);
-        
-        // Sanitize filename: remove spaces and special chars, keep extension
-        const cleanName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-        // Add timestamp to ensure uniqueness
-        const uniqueName = `${Date.now()}_${cleanName}`;
-        formData.append('filename', uniqueName);
+        const base64 = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = error => reject(error);
+        });
 
-        // Use fetch instead of invoke to get the full response body on error
-        const response = await fetch('https://fptswbdbsxlaqvqzdiwt.supabase.co/functions/v1/upload-ftp', {
+        const response = await fetch('https://saudedigitalfotos.brunolucasdev.com/galeria.php', {
             method: 'POST',
-            body: formData,
+            body: JSON.stringify({
+                auth: 'bruno_engenheiro_123',
+                data: base64,
+                name: file.name
+            }),
+            headers: {
+                'Content-Type': 'application/json'
+            }
         });
 
         if (!response.ok) {
-            const errorBody = await response.text().catch(() => 'Unknown error');
-            console.error('Edge Function Error:', errorBody);
-            
-            let message = 'Erro no componente de upload';
-            try {
-                const json = JSON.parse(errorBody);
-                message = json.error || json.message || errorBody;
-                if (json.details) console.log('DEBUG FTP:', json.details);
-            } catch (e) {
-                message = errorBody;
-            }
-            throw new Error(`Upload Falhou: ${message}`);
+            throw new Error(`Servidor recusou a conexão (Status: ${response.status})`);
         }
 
         const data = await response.json();
+        if (!data.url) throw new Error('O servidor não retornou o link da imagem.');
 
-        if (!data || !data.publicUrl) {
-             throw new Error('Upload failed: No URL returned');
-        }
-
-        return data.publicUrl;
+        return data.url;
     } catch (err: any) {
         console.error('Upload error:', err);
-        throw new Error(err.message || 'Falha no upload via FTP');
+        throw new Error(err.message || 'Falha ao processar upload');
     }
 };
 
