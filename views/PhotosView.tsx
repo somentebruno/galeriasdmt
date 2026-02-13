@@ -16,7 +16,7 @@ const MEMORIES: Memory[] = [
   { id: 'm1', src: "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=500&q=60", subtitle: "Conectando Vidas", title: "Telemedicina Rural" },
   { id: 'm2', src: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=500&q=60", subtitle: "Gestão Inteligente", title: "Monitoramento em Tempo Real" },
   { id: 'm3', src: "https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&w=500&q=60", subtitle: "Cuiabá", title: "Hospital Digital" },
-  { id: 'm4', src: "https://images.unsplash.com/photo-1576091160550-217358c7e618?auto=format&fit=crop&w=500&q=60", subtitle: "Inovação", title: "Tecnologia e Cuidado" },
+  { id: 'm4', src: "https://images.unsplash.com/photo-1516549655169-df83a25a836f?auto=format&fit=crop&w=500&q=60", subtitle: "Inovação", title: "Tecnologia e Cuidado" },
   { id: 'm5', src: "https://images.unsplash.com/photo-1581056771107-24ca5f033842?auto=format&fit=crop&w=500&q=60", subtitle: "Humanização", title: "Equipe Multidisciplinar" },
 ];
 
