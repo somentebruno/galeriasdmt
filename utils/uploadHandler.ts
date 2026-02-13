@@ -19,7 +19,12 @@ export const uploadToHostinger = async (file: File): Promise<string> => {
         });
 
         if (error) {
-            throw new Error(`Edge Function Error: ${error.message}`);
+            // Supabase client might wrap the error. Let's try to get the message from the body if possible
+            let msg = error.message;
+            if (error instanceof Error && 'details' in error) {
+                console.error('Edge Function Details:', (error as any).details);
+            }
+            throw new Error(`Erro na Edge Function: ${msg}`);
         }
 
         if (!data || !data.publicUrl) {
