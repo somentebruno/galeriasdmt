@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import heic2any from 'heic2any';
 import { supabase } from '../lib/supabase';
-import { uploadToFTP, getYoutubeID, getVideoThumbnail } from '../utils/uploadHandler';
+import { uploadToHostinger, getYoutubeID, getVideoThumbnail } from '../utils/uploadHandler';
 import Button from './UI/Button';
 
 interface UploadModalProps {
@@ -98,11 +98,11 @@ const UploadModal: React.FC<UploadModalProps> = ({ onClose, onSuccess }) => {
                     fileToUpload = new File([conversionResult], originalName.replace(/\.heic$/i, '.jpg'), { type: 'image/jpeg' });
                 }
 
-                // 2. Upload to FTP
+                // 2. Upload to Hostinger
                 newFiles[i].status = 'uploading';
                 setFiles([...newFiles]);
 
-                const publicUrl = await uploadToFTP(fileToUpload);
+                const publicUrl = await uploadToHostinger(fileToUpload);
 
                 // 3. Save to Supabase
                 // Use original filename as title (without extension)

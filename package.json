@@ -22,6 +22,7 @@
     "@tailwindcss/forms": "^0.5.7",
     "@types/file-saver": "^2.0.7",
     "@types/node": "^25.2.3",
+    "@types/react-dropzone": "^4.2.2",
     "@vitejs/plugin-react": "^5.1.4",
     "autoprefixer": "^10.4.17",
     "postcss": "^8.4.35",

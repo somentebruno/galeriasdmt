@@ -1,37 +1,40 @@
 import { supabase } from '../lib/supabase';
 
 /**
- * Uploads a file to Hostinger via Supabase Edge Function 'upload-ftp'.
+ * Uploads a file directly to Hostinger via the PHP upload script.
  * @param file The file to upload.
  * @returns The public URL of the uploaded file.
  */
-export const uploadToFTP = async (file: File): Promise<string> => {
+export const uploadToHostinger = async (file: File): Promise<string> => {
     try {
         const formData = new FormData();
-        formData.append('file', file);
-        // Sanitize filename: remove spaces and special chars, keep extension
-        const cleanName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-        // Add timestamp to ensure uniqueness
-        const uniqueName = `${Date.now()}_${cleanName}`;
+        // The PHP script expects the field name 'imagem'
+        formData.append('imagem', file);
         
-        formData.append('filename', uniqueName);
-
-        const { data, error } = await supabase.functions.invoke('upload-ftp', {
+        const response = await fetch('https://saudedigitalfotos.brunolucasdev.com/upload.php', {
+            method: 'POST',
             body: formData,
+            headers: {
+                // The PHP script expects this secret key in the Authorization header
+                'Authorization': 'bruno_engenheiro_123'
+            }
         });
 
-        if (error) {
-            throw new Error(`Edge Function Error: ${error.message}`);
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.mensagem || `Erro no servidor: ${response.status}`);
         }
 
-        if (!data || !data.publicUrl) {
-             throw new Error('Upload failed: No URL returned');
+        const data = await response.json();
+
+        if (data.status !== 'sucesso' || !data.url) {
+            throw new Error(data.mensagem || 'Falha no upload');
         }
 
-        return data.publicUrl;
+        return data.url;
     } catch (err: any) {
-        console.error('Upload error:', err);
-        throw new Error(err.message || 'Falha no upload FTP');
+        console.error('Hostinger Upload error:', err);
+        throw new Error(err.message || 'Falha ao enviar imagem para o servidor');
     }
 };
 
