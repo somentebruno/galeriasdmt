@@ -14,18 +14,28 @@ export const uploadToHostinger = async (file: File): Promise<string> => {
         const uniqueName = `${Date.now()}_${cleanName}`;
         formData.append('filename', uniqueName);
 
-        const { data, error } = await supabase.functions.invoke('upload-ftp', {
+        // Use fetch instead of invoke to get the full response body on error
+        const response = await fetch('https://fptswbdbsxlaqvqzdiwt.supabase.co/functions/v1/upload-ftp', {
+            method: 'POST',
             body: formData,
         });
 
-        if (error) {
-            // Supabase client might wrap the error. Let's try to get the message from the body if possible
-            let msg = error.message;
-            if (error instanceof Error && 'details' in error) {
-                console.error('Edge Function Details:', (error as any).details);
+        if (!response.ok) {
+            const errorBody = await response.text().catch(() => 'Unknown error');
+            console.error('Edge Function Error:', errorBody);
+            
+            let message = 'Erro no componente de upload';
+            try {
+                const json = JSON.parse(errorBody);
+                message = json.error || json.message || errorBody;
+                if (json.details) console.log('DEBUG FTP:', json.details);
+            } catch (e) {
+                message = errorBody;
             }
-            throw new Error(`Erro na Edge Function: ${msg}`);
+            throw new Error(`Upload Falhou: ${message}`);
         }
+
+        const data = await response.json();
 
         if (!data || !data.publicUrl) {
              throw new Error('Upload failed: No URL returned');
