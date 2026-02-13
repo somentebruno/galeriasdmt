@@ -8,16 +8,14 @@ import { supabase } from '../lib/supabase';
 export const uploadToHostinger = async (file: File): Promise<string> => {
     try {
         const formData = new FormData();
-        // The PHP script expects the field name 'imagem'
+        // The PHP script now expects the field name 'imagem'
         formData.append('imagem', file);
+        // Sending key via POST is safer against server firewalls (403)
+        formData.append('chave', 'bruno_engenheiro_123');
         
         const response = await fetch('https://saudedigitalfotos.brunolucasdev.com/upload.php', {
             method: 'POST',
-            body: formData,
-            headers: {
-                // The PHP script expects this secret key in the Authorization header
-                'Authorization': 'bruno_engenheiro_123'
-            }
+            body: formData
         });
 
         if (!response.ok) {

@@ -1,4 +1,5 @@
-import React, { useState, useCallback } from 'react';
+import * as React from 'react';
+import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import heic2any from 'heic2any';
 import { supabase } from '../lib/supabase';
@@ -84,28 +85,30 @@ const UploadModal: React.FC<UploadModalProps> = ({ onClose, onSuccess }) => {
             const originalName = fileToUpload.name;
 
             try {
-                // 1. Convert HEIC if needed
-                const isHeic = fileToUpload.name.toLowerCase().endsWith('.heic') || 
-                               fileToUpload.name.toLowerCase().endsWith('.heif') ||
-                               fileToUpload.type === 'image/heic' ||
-                               fileToUpload.type === 'image/heif';
+                // 1. Convert HEIC/HEIF if needed
+                const fileName = fileToUpload.name.toLowerCase();
+                const isHeic = fileName.endsWith('.heic') || fileName.endsWith('.heif') || fileToUpload.type === 'image/heic' || fileToUpload.type === 'image/heif';
 
                 if (isHeic) {
                     newFiles[i].status = 'converting';
                     setFiles([...newFiles]);
                     
                     try {
+                        // Ensure we have a valid blob
+                        const blob = fileToUpload.slice(0, fileToUpload.size, fileToUpload.type);
                         const convertedBlob = await heic2any({
-                            blob: fileToUpload,
+                            blob: blob,
                             toType: 'image/jpeg',
-                            quality: 0.8
+                            quality: 0.7 // Slightly lower quality for better compatibility
                         });
 
-                        const conversionResult = Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob;
-                        fileToUpload = new File([conversionResult], originalName.replace(/\.(heic|heif)$/i, '.jpg'), { type: 'image/jpeg' });
+                        const result = Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob;
+                        fileToUpload = new File([result], originalName.replace(/\.(heic|heif)$/i, '.jpg'), { type: 'image/jpeg' });
                     } catch (convErr: any) {
-                        console.error('HEIC Conversion error:', convErr);
-                        throw new Error(`Falha ao converter HEIC: ${convErr.message || 'Formato não suportado'}`);
+                        console.error('HEIC Error:', convErr);
+                        // If conversion fails, we'll try to upload the original file anyway, 
+                        // maybe the server can handle it or the user can see the error
+                        throw new Error(`Não foi possível converter esta foto do iPhone (HEIC). Tente converter para JPG antes de subir.`);
                     }
                 }
 
