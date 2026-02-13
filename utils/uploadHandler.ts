@@ -1,60 +1,35 @@
 import { supabase } from '../lib/supabase';
 
 /**
- * Uploads a file directly to Hostinger via the PHP upload script.
- * @param file The file to upload.
- * @returns The public URL of the uploaded file.
+ * Uploads a file via Supabase Edge Function which handles FTP to Hostinger.
  */
 export const uploadToHostinger = async (file: File): Promise<string> => {
     try {
-        // Convert file to Base64
-        const base64 = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onload = () => resolve(reader.result as string);
-            reader.onerror = error => reject(error);
-        });
-
-        // Use URLSearchParams to simulate a standard text form POST
-        const body = new URLSearchParams();
-        body.append('chave', 'bruno_engenheiro_123');
-        body.append('imagem', base64);
-        body.append('nome', file.name);
+        const formData = new FormData();
+        formData.append('file', file);
         
-        const response = await fetch('https://saudedigitalfotos.brunolucasdev.com/upload.php', {
-            method: 'POST',
-            body: body,
-            headers: {
-                // DO NOT set any other headers, URLSearchParams sets the correct content-type automatically
-                'Content-Type': 'application/x-www-form-urlencoded'
-            }
+        // Sanitize filename: remove spaces and special chars, keep extension
+        const cleanName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+        // Add timestamp to ensure uniqueness
+        const uniqueName = `${Date.now()}_${cleanName}`;
+        formData.append('filename', uniqueName);
+
+        const { data, error } = await supabase.functions.invoke('upload-ftp', {
+            body: formData,
         });
 
-        if (!response.ok) {
-            let errorMessage = `Erro no servidor: ${response.status}`;
-            try {
-                const errorData = await response.json();
-                errorMessage = errorData.mensagem || errorMessage;
-            } catch (e) {
-                // If not JSON, try text
-                const text = await response.text().catch(() => '');
-                if (text.includes('403 Forbidden')) {
-                    errorMessage = "Acesso Negado (403): O servidor Hostinger bloqueou a requisição. Verifique o .htaccess ou ModSecurity.";
-                }
-            }
-            throw new Error(errorMessage);
+        if (error) {
+            throw new Error(`Edge Function Error: ${error.message}`);
         }
 
-        const data = await response.json();
-
-        if (data.status !== 'sucesso' || !data.url) {
-            throw new Error(data.mensagem || 'Falha no upload');
+        if (!data || !data.publicUrl) {
+             throw new Error('Upload failed: No URL returned');
         }
 
-        return data.url;
+        return data.publicUrl;
     } catch (err: any) {
-        console.error('Hostinger Upload error:', err);
-        throw new Error(err.message || 'Falha ao enviar imagem para o servidor');
+        console.error('Upload error:', err);
+        throw new Error(err.message || 'Falha no upload via FTP');
     }
 };
 
