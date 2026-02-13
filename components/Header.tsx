@@ -4,18 +4,27 @@ import Avatar from './UI/Avatar';
 import Button from './UI/Button';
 import { supabase } from '../lib/supabase';
 
+import UploadModal from './UploadModal';
+
 interface HeaderProps {
   activeView?: ViewState;
   onNavigate?: (view: ViewState) => void;
   onSearch?: (term: string) => void;
   searchTerm?: string;
+  onUploadSuccess?: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ activeView, onNavigate, onSearch, searchTerm }) => {
+const Header: React.FC<HeaderProps> = ({ activeView, onNavigate, onSearch, searchTerm, onUploadSuccess }) => {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
+  };
+
+  const handleUploadSuccess = () => {
+    setShowUploadModal(false);
+    onUploadSuccess?.();
   };
 
   const getBreadcrumbs = () => {
@@ -61,6 +70,15 @@ const Header: React.FC<HeaderProps> = ({ activeView, onNavigate, onSearch, searc
         </div>
 
         <div className="flex items-center gap-2 md:gap-4 ml-4">
+            
+          {/* Upload Button */}
+          <Button 
+            className="hidden sm:flex bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-full font-medium transition-colors shadow-lg shadow-primary/20"
+            onClick={() => setShowUploadModal(true)}
+            icon="cloud_upload"
+          >
+            <span className="hidden lg:inline ml-2">Fazer Upload</span>
+          </Button>
 
           <div className="flex items-center gap-1 text-slate-500 dark:text-slate-400">
             <Button variant="ghost" icon="help_outline" />
@@ -90,6 +108,13 @@ const Header: React.FC<HeaderProps> = ({ activeView, onNavigate, onSearch, searc
           </div>
         </div>
       </header>
+
+      {showUploadModal && (
+        <UploadModal 
+            onClose={() => setShowUploadModal(false)}
+            onSuccess={handleUploadSuccess}
+        />
+      )}
     </>
   );
 };
