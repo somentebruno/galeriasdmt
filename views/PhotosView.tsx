@@ -187,19 +187,35 @@ const PhotosView: React.FC<PhotosViewProps> = ({ onPhotoClick, refreshKey, searc
         });
 
         const updates: any = {};
-        const exifDate = metadata?.DateTimeOriginal || 
-                        metadata?.CreateDate || 
-                        metadata?.ModifyDate || 
-                        metadata?.DateCreated || 
-                        metadata?.DateTimeDigitized ||
-                        metadata?.GPSDateStamp;
+        let candidateDate: any = null;
         
-        if (exifDate) {
-          updates.taken_at = (exifDate instanceof Date) 
-            ? exifDate.toISOString() 
-            : new Date(exifDate).toISOString();
+        if (metadata) {
+          // Busca exaustiva: Campos padrão
+          candidateDate = metadata.DateTimeOriginal || metadata.CreateDate || metadata.DateCreated || metadata.DateTimeDigitized || metadata.ModifyDate || metadata.GPSDateStamp;
+          
+          // Busca heurística se campos padrão falharem
+          if (!candidateDate) {
+              const dateKeys = Object.keys(metadata).filter(k => 
+                  k.toLowerCase().includes('date') || 
+                  k.toLowerCase().includes('time') || 
+                  k.toLowerCase().includes('orig')
+              ).sort();
+              
+              for (const dk of dateKeys) {
+                  const val = metadata[dk];
+                  if (val instanceof Date || (typeof val === 'string' && val.match(/^\d{4}/))) {
+                      candidateDate = val;
+                      break;
+                  }
+              }
+          }
+        }
+        
+        if (candidateDate) {
+          updates.taken_at = (candidateDate instanceof Date) 
+            ? candidateDate.toISOString() 
+            : new Date(candidateDate).toISOString();
         } else {
-          // If no exif, use created_at to avoid re-syncing constantly
           updates.taken_at = (photo as any).created_at;
         }
         if (metadata?.latitude) updates.latitude = metadata.latitude;
