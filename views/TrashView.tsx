@@ -74,9 +74,12 @@ const TrashView: React.FC<TrashViewProps> = ({ onPhotoClick, refreshKey, onResto
                 }
             }
 
-            // 1.1 Delete from Hostinger
+            // 1.1 Delete from Hostinger (Before Supabase Delete)
             if (photo.src.includes('brunolucasdev.com')) {
-                await deleteFromHostinger(photo.src);
+                const proceed = await deleteFromHostinger(photo.src);
+                if (!proceed) {
+                    throw new Error('Falha ao comunicar com a API de deleção da Hostinger. A exclusão foi cancelada por segurança.');
+                }
             }
 
             // 2. Delete from DB
@@ -130,9 +133,18 @@ const TrashView: React.FC<TrashViewProps> = ({ onPhotoClick, refreshKey, onResto
                 if (storageError) console.error('Erro ao limpar storage:', storageError);
             }
 
-            // 3.1 Delete from Hostinger
+            // 3.1 Delete from Hostinger (Before Supabase Delete)
             if (hostingerUrlsToDelete.length > 0) {
-                await Promise.all(hostingerUrlsToDelete.map(url => deleteFromHostinger(url)));
+                const results = await Promise.all(hostingerUrlsToDelete.map(url => deleteFromHostinger(url)));
+                // We proceed even if some fail? Or stop? 
+                // For "Empty Trash", we usually want to proceed but maybe alert if some failed.
+                const allSuccess = results.every(res => res === true);
+                if (!allSuccess) {
+                    if (!confirm('Alguns arquivos não puderam ser deletados do servidor Hostinger. Deseja limpar a lixeira no banco de dados mesmo assim?')) {
+                        setLoading(false);
+                        return;
+                    }
+                }
             }
 
             // 4. Delete from DB

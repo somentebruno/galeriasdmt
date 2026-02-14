@@ -90,18 +90,15 @@ export const getVideoThumbnail = (videoId: string): string => {
 };
 /**
  * Deletes a file from Hostinger storage via API.
+ * Returns true if the file was deleted or was not found (404),
+ * allowing the calling code to proceed with database deletion.
  */
-export const deleteFromHostinger = async (url: string): Promise<void> => {
+export const deleteFromHostinger = async (url: string): Promise<boolean> => {
     const DELETE_URL = 'https://api.brunolucasdev.com/delete.php';
-    const API_KEY = (import.meta as any).env?.VITE_DELETE_API_KEY;
-
-    if (!API_KEY) {
-        console.error('Delete API Key not found in environment variables.');
-        return;
-    }
+    // User explicitly requested SHAKIRASHAKIRA for this implementation
+    const API_KEY = (import.meta as any).env?.VITE_DELETE_API_KEY || 'SHAKIRASHAKIRA';
 
     try {
-
         const response = await fetch(DELETE_URL, {
             method: 'POST',
             headers: {
@@ -111,12 +108,17 @@ export const deleteFromHostinger = async (url: string): Promise<void> => {
             body: JSON.stringify({ url })
         });
 
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error(`Falha ao deletar arquivo na Hostinger: ${errorText}`);
+        // 200/204 means success, 404 means already gone - both allow proceeding to DB delete
+        if (response.ok || response.status === 404) {
+            return true;
         }
+
+        const errorText = await response.text();
+        console.error(`Falha ao deletar arquivo na Hostinger (${response.status}): ${errorText}`);
+        return false;
     } catch (err) {
         console.error('Erro ao chamar API de deleção:', err);
+        return false;
     }
 };
+
