@@ -93,9 +93,15 @@ export const getVideoThumbnail = (videoId: string): string => {
  */
 export const deleteFromHostinger = async (url: string): Promise<void> => {
     const DELETE_URL = 'https://api.brunolucasdev.com/delete.php';
-    const API_KEY = (import.meta as any).env?.VITE_DELETE_API_KEY || 'sua_chave_de_deletar_aqui';
+    const API_KEY = (import.meta as any).env?.VITE_DELETE_API_KEY;
+
+    if (!API_KEY) {
+        console.error('Delete API Key not found in environment variables.');
+        return;
+    }
 
     try {
+
         const response = await fetch(DELETE_URL, {
             method: 'POST',
             headers: {
@@ -104,6 +110,7 @@ export const deleteFromHostinger = async (url: string): Promise<void> => {
             },
             body: JSON.stringify({ url })
         });
+
 
         if (!response.ok) {
             const errorText = await response.text();
