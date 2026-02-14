@@ -9,20 +9,33 @@ import Button from './UI/Button';
 
 // Instância global para não recarregar a cada arquivo
 let ffmpegInstance: FFmpeg | null = null;
+let isLoadingFFmpeg = false;
 
 const loadFFmpeg = async () => {
     if (ffmpegInstance) return ffmpegInstance;
+    if (isLoadingFFmpeg) {
+        // Aguarda carregar se já estiver em progresso
+        while (isLoadingFFmpeg) {
+            await new Promise(r => setTimeout(r, 100));
+            if (ffmpegInstance) return ffmpegInstance;
+        }
+    }
     
-    const ffmpeg = new FFmpeg();
-    const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
-    
-    await ffmpeg.load({
-        coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-        wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-    });
-    
-    ffmpegInstance = ffmpeg;
-    return ffmpeg;
+    isLoadingFFmpeg = true;
+    try {
+        const ffmpeg = new FFmpeg();
+        const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
+        
+        await ffmpeg.load({
+            coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+            wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+        });
+        
+        ffmpegInstance = ffmpeg;
+        return ffmpeg;
+    } finally {
+        isLoadingFFmpeg = false;
+    }
 };
 
 interface UploadModalProps {
@@ -115,36 +128,47 @@ const UploadModal: React.FC<UploadModalProps> = ({ onClose, onSuccess }) => {
                     newFiles[i].status = 'converting';
                     setFiles([...newFiles]);
                     
+                    let ffmpeg;
                     try {
-                        console.log(`[FFmpeg] Preparando conversão de ${originalName}`);
-                        const ffmpeg = await loadFFmpeg();
+                        ffmpeg = await loadFFmpeg();
                         
-                        // Escreve o arquivo na memória do FFmpeg
-                        const inputName = 'input.heic';
-                        const outputName = 'output.jpg';
-                        await ffmpeg.writeFile(inputName, await fetchFile(fileToUpload));
+                        // Gerar nomes únicos para o sistema de arquivos virtual para evitar "FS error"
+                        const id = Math.random().toString(36).substring(7);
+                        const inputName = `in_${id}.heic`;
+                        const outputName = `out_${id}.jpg`;
 
-                        // Executa o comando de conversão (Motor Profissional)
-                        // -i: input, vframes 1: pega o primeiro frame (resolve Live Photos)
+                        console.log(`[FFmpeg] Convertendo ${originalName} (ID: ${id})`);
+                        
+                        // Converter File para Uint8Array de forma explícita
+                        const arrayBuffer = await fileToUpload.arrayBuffer();
+                        await ffmpeg.writeFile(inputName, new Uint8Array(arrayBuffer));
+
+                        // Comando de conversão profissional
                         await ffmpeg.exec(['-i', inputName, '-vframes', '1', outputName]);
 
-                        // Lê o arquivo convertido
+                        // Ler o resultado
                         const data = await ffmpeg.readFile(outputName);
-                        // Convertendo de forma segura para Blob (tratando Uint8Array/SharedArrayBuffer)
                         const resultBlob = new Blob([data as any], { type: 'image/jpeg' });
                         
                         fileToUpload = new File([resultBlob], originalName.replace(/\.(heic|heif)$/i, '.jpg'), { type: 'image/jpeg' });
                         
-                        // Limpa a memória
-                        await ffmpeg.deleteFile(inputName);
-                        await ffmpeg.deleteFile(outputName);
+                        // Limpar arquivos
+                        try {
+                            await ffmpeg.deleteFile(inputName);
+                            await ffmpeg.deleteFile(outputName);
+                        } catch (e) {
+                            console.warn('[FFmpeg] Erro ao limpar arquivos temporários:', e);
+                        }
                         
-                        console.log(`[FFmpeg] Conversão concluída: ${fileToUpload.name}`);
+                        console.log(`[FFmpeg] Sucesso: ${fileToUpload.name}`);
                     } catch (convErr: any) {
-                        console.error('[FFmpeg] Erro na conversão:', convErr);
-                        throw new Error(`O motor FFmpeg não conseguiu processar este arquivo. Tente convertê-lo manualmente.`);
+                        console.error('[FFmpeg] Falha no motor:', convErr);
+                        // Resetar instância em caso de erro grave de sistema de arquivos
+                        ffmpegInstance = null;
+                        throw new Error(`Erro no motor de conversão. Tente novamente em instantes.`);
                     }
                 }
+
 
 
 
