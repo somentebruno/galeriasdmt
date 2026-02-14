@@ -126,31 +126,13 @@ const UploadModal: React.FC<UploadModalProps> = ({ onClose, onSuccess }) => {
             const originalName = fileToUpload.name;
 
             try {
-                // 1. Convert HEIC/HEIF if needed using Cloudinary API
-                const fileName = originalName.toLowerCase();
-                const isHeic = fileName.endsWith('.heic') || fileName.endsWith('.heif') || 
-                              fileToUpload.type.includes('heic') || fileToUpload.type.includes('heif');
-
-                if (isHeic) {
-                    newFiles[i].status = 'converting';
-                    setFiles([...newFiles]);
-                    
-                    console.log(`[Cloudinary] Convertendo ${originalName}...`);
-                    fileToUpload = await convertHeicWithCloudinary(fileToUpload);
-                    console.log(`[Cloudinary] Sucesso: ${fileToUpload.name}`);
-                }
-
-
-
-
-
-
-                // 2. Extract Metadata (Exif)
+                // 1. Extract Metadata (Exif) early - especially important for HEIC before it gets converted
                 let takenAt = new Date().toISOString();
                 let lat = null;
                 let lng = null;
 
                 try {
+                    // Always parse the original file for metadata
                     const metadata = await exifr.parse(fileToUpload, {
                         pick: ['DateTimeOriginal', 'CreateDate', 'ModifyDate', 'latitude', 'longitude'],
                         reviveValues: true
@@ -172,7 +154,21 @@ const UploadModal: React.FC<UploadModalProps> = ({ onClose, onSuccess }) => {
                     console.warn(`[Metadata] Falha ao ler Exif de ${originalName}:`, metaErr);
                 }
 
-                // 2. Upload to Hostinger
+                // 2. Convert HEIC/HEIF if needed using Cloudinary API
+                const fileName = originalName.toLowerCase();
+                const isHeic = fileName.endsWith('.heic') || fileName.endsWith('.heif') || 
+                              fileToUpload.type.includes('heic') || fileToUpload.type.includes('heif');
+
+                if (isHeic) {
+                    newFiles[i].status = 'converting';
+                    setFiles([...newFiles]);
+                    
+                    console.log(`[Cloudinary] Convertendo ${originalName}...`);
+                    fileToUpload = await convertHeicWithCloudinary(fileToUpload);
+                    console.log(`[Cloudinary] Sucesso: ${fileToUpload.name}`);
+                }
+
+                // 3. Upload to Hostinger
                 newFiles[i].status = 'uploading';
                 setFiles([...newFiles]);
 
