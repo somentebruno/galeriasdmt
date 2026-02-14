@@ -1,42 +1,14 @@
 import * as React from 'react';
 import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { FFmpeg } from '@ffmpeg/ffmpeg';
-import { fetchFile, toBlobURL } from '@ffmpeg/util';
 import { supabase } from '../lib/supabase';
 import { uploadToHostinger, getYoutubeID, getVideoThumbnail } from '../utils/uploadHandler';
 import Button from './UI/Button';
 
-// Instância global para não recarregar a cada arquivo
-let ffmpegInstance: FFmpeg | null = null;
-let isLoadingFFmpeg = false;
 
-const loadFFmpeg = async () => {
-    if (ffmpegInstance) return ffmpegInstance;
-    if (isLoadingFFmpeg) {
-        // Aguarda carregar se já estiver em progresso
-        while (isLoadingFFmpeg) {
-            await new Promise(r => setTimeout(r, 100));
-            if (ffmpegInstance) return ffmpegInstance;
-        }
-    }
-    
-    isLoadingFFmpeg = true;
-    try {
-        const ffmpeg = new FFmpeg();
-        const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
-        
-        await ffmpeg.load({
-            coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-            wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-        });
-        
-        ffmpegInstance = ffmpeg;
-        return ffmpeg;
-    } finally {
-        isLoadingFFmpeg = false;
-    }
-};
+// Cloudinary Configuration (Unsigned Upload)
+const CLOUDINARY_CLOUD_NAME = (import.meta as any).env?.VITE_CLOUDINARY_CLOUD_NAME;
+const CLOUDINARY_UPLOAD_PRESET = (import.meta as any).env?.VITE_CLOUDINARY_UPLOAD_PRESET;
 
 interface UploadModalProps {
     onClose: () => void;
@@ -99,6 +71,37 @@ const UploadModal: React.FC<UploadModalProps> = ({ onClose, onSuccess }) => {
         });
     };
 
+    const convertHeicWithCloudinary = async (file: File): Promise<File> => {
+        if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) {
+            throw new Error('Configuração da Cloudinary não encontrada no .env. Adicione VITE_CLOUDINARY_CLOUD_NAME e VITE_CLOUDINARY_UPLOAD_PRESET.');
+        }
+
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+
+        // Upload to Cloudinary
+        const response = await fetch(
+            `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+            { method: 'POST', body: formData }
+        );
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(`Erro na Cloudinary: ${error.error?.message || 'Falha no upload'}`);
+        }
+
+        const data = await response.json();
+        // Cloudinary retorna secure_url. Forçamos a conversão para JPG mudando a extensão se necessário
+        const jpgUrl = data.secure_url.replace(/\.[^/.]+$/, ".jpg");
+
+        // Baixamos o JPG convertido para enviar para a Hostinger
+        const jpgResponse = await fetch(jpgUrl);
+        const jpgBlob = await jpgResponse.blob();
+        
+        return new File([jpgBlob], file.name.replace(/\.(heic|heif)$/i, '.jpg'), { type: 'image/jpeg' });
+    };
+
     const processQueue = async () => {
         setIsProcessing(true);
         const { data: { user } } = await supabase.auth.getUser();
@@ -119,7 +122,7 @@ const UploadModal: React.FC<UploadModalProps> = ({ onClose, onSuccess }) => {
             const originalName = fileToUpload.name;
 
             try {
-                // 1. Convert HEIC/HEIF if needed using FFmpeg
+                // 1. Convert HEIC/HEIF if needed using Cloudinary API
                 const fileName = originalName.toLowerCase();
                 const isHeic = fileName.endsWith('.heic') || fileName.endsWith('.heif') || 
                               fileToUpload.type.includes('heic') || fileToUpload.type.includes('heif');
@@ -128,46 +131,11 @@ const UploadModal: React.FC<UploadModalProps> = ({ onClose, onSuccess }) => {
                     newFiles[i].status = 'converting';
                     setFiles([...newFiles]);
                     
-                    let ffmpeg;
-                    try {
-                        ffmpeg = await loadFFmpeg();
-                        
-                        // Gerar nomes únicos para o sistema de arquivos virtual para evitar "FS error"
-                        const id = Math.random().toString(36).substring(7);
-                        const inputName = `in_${id}.heic`;
-                        const outputName = `out_${id}.jpg`;
-
-                        console.log(`[FFmpeg] Convertendo ${originalName} (ID: ${id})`);
-                        
-                        // Converter File para Uint8Array de forma explícita
-                        const arrayBuffer = await fileToUpload.arrayBuffer();
-                        await ffmpeg.writeFile(inputName, new Uint8Array(arrayBuffer));
-
-                        // Comando de conversão profissional
-                        await ffmpeg.exec(['-i', inputName, '-vframes', '1', outputName]);
-
-                        // Ler o resultado
-                        const data = await ffmpeg.readFile(outputName);
-                        const resultBlob = new Blob([data as any], { type: 'image/jpeg' });
-                        
-                        fileToUpload = new File([resultBlob], originalName.replace(/\.(heic|heif)$/i, '.jpg'), { type: 'image/jpeg' });
-                        
-                        // Limpar arquivos
-                        try {
-                            await ffmpeg.deleteFile(inputName);
-                            await ffmpeg.deleteFile(outputName);
-                        } catch (e) {
-                            console.warn('[FFmpeg] Erro ao limpar arquivos temporários:', e);
-                        }
-                        
-                        console.log(`[FFmpeg] Sucesso: ${fileToUpload.name}`);
-                    } catch (convErr: any) {
-                        console.error('[FFmpeg] Falha no motor:', convErr);
-                        // Resetar instância em caso de erro grave de sistema de arquivos
-                        ffmpegInstance = null;
-                        throw new Error(`Erro no motor de conversão. Tente novamente em instantes.`);
-                    }
+                    console.log(`[Cloudinary] Convertendo ${originalName}...`);
+                    fileToUpload = await convertHeicWithCloudinary(fileToUpload);
+                    console.log(`[Cloudinary] Sucesso: ${fileToUpload.name}`);
                 }
+
 
 
 
