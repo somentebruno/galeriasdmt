@@ -161,18 +161,18 @@ const PhotosView: React.FC<PhotosViewProps> = ({ onPhotoClick, refreshKey, searc
   };
 
   const syncOldPhotos = async () => {
-    const unsynced = uploadedPhotos.filter(p => !(p as any).taken_at && p.media_type === 'image');
-    if (unsynced.length === 0) {
-      alert('Todas as fotos já estão sincronizadas!');
+    const imagesToSync = uploadedPhotos.filter(p => p.media_type === 'image');
+    if (imagesToSync.length === 0) {
+      alert('Nenhuma foto encontrada para sincronizar!');
       return;
     }
 
-    if (!confirm(`Sincronizar datas de ${unsynced.length} fotos antigas? Isso pode levar algum tempo.`)) return;
+    if (!confirm(`Deseja sincronizar as datas de ${imagesToSync.length} fotos? Isso verificará os metadados Exif originais de cada uma.`)) return;
 
     setIsProcessing(true);
     let successCount = 0;
 
-    for (const photo of unsynced) {
+    for (const photo of imagesToSync) {
       try {
         console.log(`[Sync] Processando ${photo.title}...`);
         const response = await fetch(photo.src);
@@ -340,12 +340,13 @@ const PhotosView: React.FC<PhotosViewProps> = ({ onPhotoClick, refreshKey, searc
         </div>
 
         <div className="flex items-center gap-2">
-            {/* Sync Button */}
-            {uploadedPhotos.some(p => !(p as any).taken_at && p.media_type === 'image') && !isSelectionMode && (
+            {/* Sync Button - Persistent for troubleshooting */}
+            {!isSelectionMode && uploadedPhotos.some(p => p.media_type === 'image') && (
                 <button
                   onClick={syncOldPhotos}
                   disabled={isProcessing}
                   className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-600 hover:bg-amber-100 transition-colors text-sm font-medium dark:bg-amber-900/20 dark:border-amber-900/30 dark:text-amber-400"
+                  title="Sincronizar ou atualizar as datas das fotos"
                 >
                   <span className={`material-icons text-lg ${isProcessing ? 'animate-spin' : ''}`}>sync</span>
                   <span className="hidden md:inline">Sincronizar Datas</span>
