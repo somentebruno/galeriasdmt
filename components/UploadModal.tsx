@@ -72,8 +72,13 @@ const UploadModal: React.FC<UploadModalProps> = ({ onClose, onSuccess }) => {
     };
 
     const convertHeicWithCloudinary = async (file: File): Promise<File> => {
+        // Log para debug (mascarado por segurança)
+        console.log('[Cloudinary] Verificando configuração...');
+        console.log('[Cloudinary] Cloud Name:', CLOUDINARY_CLOUD_NAME ? 'OK' : 'MISSING');
+        console.log('[Cloudinary] Preset:', CLOUDINARY_UPLOAD_PRESET ? 'OK' : 'MISSING');
+
         if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) {
-            throw new Error('Configuração da Cloudinary não encontrada no .env. Adicione VITE_CLOUDINARY_CLOUD_NAME e VITE_CLOUDINARY_UPLOAD_PRESET.');
+            throw new Error('Configuração da Cloudinary ausente. Verifique se adicionou VITE_CLOUDINARY_CLOUD_NAME e VITE_CLOUDINARY_UPLOAD_PRESET no painel da Vercel e fez um Redeploy.');
         }
 
         const formData = new FormData();
@@ -87,8 +92,14 @@ const UploadModal: React.FC<UploadModalProps> = ({ onClose, onSuccess }) => {
         );
 
         if (!response.ok) {
-            const error = await response.json();
-            throw new Error(`Erro na Cloudinary: ${error.error?.message || 'Falha no upload'}`);
+            const errorData = await response.json();
+            const msg = errorData.error?.message || 'Falha no upload';
+            console.error('[Cloudinary] Erro detalhado:', errorData);
+            
+            if (msg.includes('Unknown API key')) {
+                throw new Error(`Erro na Cloudinary: O preset '${CLOUDINARY_UPLOAD_PRESET}' não foi encontrado ou não está como 'Unsigned'. Verifique na Cloudinary.`);
+            }
+            throw new Error(`Erro na Cloudinary: ${msg}`);
         }
 
         const data = await response.json();
