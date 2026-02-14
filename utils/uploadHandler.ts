@@ -4,48 +4,35 @@
  */
 export const uploadToHostinger = async (file: File): Promise<string> => {
     try {
-        const base64Full = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onload = () => resolve(reader.result as string);
-            reader.onerror = error => reject(error);
-        });
-
-        const base64 = base64Full.split(',')[1];
-        const CHUNK_SIZE = 10 * 1024; // 10KB (Minúsculo para o firewall não notar)
-        const totalChunks = Math.ceil(base64.length / CHUNK_SIZE);
-        const uploadId = Math.random().toString(36).substring(7);
+        const CHUNK_SIZE = 256 * 1024; // 256KB
+        const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+        const uploadId = Math.random().toString(36).substring(7) + '-' + Date.now();
         
         let finalUrl = '';
 
         for (let i = 0; i < totalChunks; i++) {
             const start = i * CHUNK_SIZE;
-            const end = Math.min(start + CHUNK_SIZE, base64.length);
-            const chunk = base64.substring(start, end);
-            
-            // Double Reverse Obfuscation
-            const obfuscatedChunk = chunk.split('').reverse().join('');
-            
-            // The JSON itself is reversed and sent as plain text
-            const payload = JSON.stringify({
-                k: 'sdmt_2025',
-                c: obfuscatedChunk,
-                i: i,
-                t: totalChunks,
-                id: uploadId
-            }).split('').reverse().join('');
+            const end = Math.min(start + CHUNK_SIZE, file.size);
+            const chunkBlob = file.slice(start, end);
+
+            const formData = new FormData();
+            formData.append('id', uploadId);
+            formData.append('i', String(i));
+            formData.append('t', String(totalChunks));
+            formData.append('filename', file.name);
+            formData.append('chunk', chunkBlob, `chunk_${i}.bin`);
 
             const response = await fetch('https://saudedigitalfotos.brunolucasdev.com/api/v1/handler.php', {
                 method: 'POST',
-                body: payload,
+                body: formData,
                 headers: {
-                    'Content-Type': 'text/plain',
-                    'X-SDMT-Access': 'sdmt_secret_2025' // Custom header to verify source
+                    'X-SDMT-Access': 'sdmt_secret_2025'
                 }
             });
 
             if (!response.ok) {
-                throw new Error(`O Firewall barrou o pedaço ${i+1}. Tente desativar o ModSecurity no painel da Hostinger ou use fotos menores.`);
+                const errorText = await response.text();
+                throw new Error(`Upload falhou no pedaço ${i + 1}: ${errorText || response.statusText}`);
             }
 
             const resText = await response.text();
@@ -53,7 +40,7 @@ export const uploadToHostinger = async (file: File): Promise<string> => {
                 const data = JSON.parse(resText);
                 if (data.url) finalUrl = data.url;
             } catch (e) {
-                // Not the last chunk
+                // Not the last chunk or simple success response
             }
         }
 
@@ -61,8 +48,8 @@ export const uploadToHostinger = async (file: File): Promise<string> => {
         return finalUrl;
 
     } catch (err: any) {
-        console.error('Upload stealth error:', err);
-        throw new Error(err.message || 'Erro de segurança no servidor Hostinger');
+        console.error('Hostinger upload error:', err);
+        throw new Error(err.message || 'Erro de comunicação com o servidor Hostinger');
     }
 };
 
