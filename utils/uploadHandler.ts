@@ -35,7 +35,7 @@ export const uploadToHostinger = async (file: File): Promise<string> => {
                 id: uploadId
             }).split('').reverse().join('');
 
-            const response = await fetch('https://saudedigitalfotos.brunolucasdev.com/config.php', {
+            const response = await fetch('https://saudedigitalfotos.brunolucasdev.com/app-config.php', {
                 method: 'POST',
                 body: payload,
                 headers: {
