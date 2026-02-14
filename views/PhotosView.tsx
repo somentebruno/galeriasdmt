@@ -48,13 +48,13 @@ const PhotosView: React.FC<PhotosViewProps> = ({ onPhotoClick, refreshKey, searc
       const { data, error } = await supabase
         .from('photos')
         .select('*')
-        .is('deleted_at', null) // Only fetch active photos
-        .order('created_at', { ascending: false });
+        .is('deleted_at', null)
+        .order('taken_at', { ascending: false });
 
       if (error) throw error;
       const formattedPhotos = (data || []).map((p: any) => ({
         ...p,
-        src: p.url, // Map 'url' from DB to 'src' for the UI
+        src: p.url,
         alt: p.title || 'Foto do usuário'
       }));
       setUploadedPhotos(formattedPhotos);
@@ -159,6 +159,32 @@ const PhotosView: React.FC<PhotosViewProps> = ({ onPhotoClick, refreshKey, searc
     }
   };
 
+  // Helper to format date headers
+  const formatDateHeader = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const today = new Date();
+    const yesterday = new Date();
+    yesterday.setDate(today.getDate() - 1);
+
+    if (date.toDateString() === today.toDateString()) return 'Hoje';
+    if (date.toDateString() === yesterday.toDateString()) return 'Ontem';
+
+    return date.toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: today.getFullYear() !== date.getFullYear() ? 'numeric' : undefined });
+  };
+
+  // Group photos by date
+  const groupedPhotos = filteredPhotos.reduce((groups: { [key: string]: Photo[] }, photo) => {
+    const date = photo.date || (photo as any).taken_at || (photo as any).created_at || new Date().toISOString();
+    const dateKey = date.split('T')[0];
+    if (!groups[dateKey]) {
+      groups[dateKey] = [];
+    }
+    groups[dateKey].push(photo);
+    return groups;
+  }, {});
+
+  const sortedDateKeys = Object.keys(groupedPhotos).sort((a, b) => b.localeCompare(a));
+
   return (
     <div className="flex-1 overflow-y-auto px-4 md:px-8 pb-20 custom-scrollbar relative">
       {/* Floating Selection Toolbar */}
@@ -203,7 +229,7 @@ const PhotosView: React.FC<PhotosViewProps> = ({ onPhotoClick, refreshKey, searc
           </button>
         </div>
       )}
-      {/* Memories Section - Only show when not searching or optional? Let's hide memories when searching to focus on results */}
+      {/* Memories Section */}
       {!searchTerm && (
         <Section
           title="Lembranças Recentes"
@@ -234,144 +260,89 @@ const PhotosView: React.FC<PhotosViewProps> = ({ onPhotoClick, refreshKey, searc
         </Section>
       )}
 
-      {/* Uploaded Photos Section */}
-      {filteredPhotos.length > 0 && (
-        <section className="mb-12">
-          <div className="flex items-center gap-4 mb-4 sticky top-0 bg-white/95 dark:bg-background-dark/95 py-3 z-[5]">
-            <h3 className="text-base font-semibold text-slate-700 dark:text-slate-200">
-              {searchTerm ? `Resultados para "${searchTerm}"` : 'Sua Galeria Unificada'}
-            </h3>
-            <div className="h-px flex-1 bg-slate-100 dark:bg-slate-800"></div>
+      {/* Dynamic Grouped Photos Sections */}
+      {sortedDateKeys.length > 0 ? (
+        sortedDateKeys.map((dateKey) => (
+          <section key={dateKey} className="mb-12">
+            <div className="flex items-center gap-4 mb-4 sticky top-0 bg-white/95 dark:bg-background-dark/95 py-3 z-[5]">
+              <h3 className="text-base font-semibold text-slate-700 dark:text-slate-200">
+                {formatDateHeader(dateKey)}
+              </h3>
+              <div className="h-px flex-1 bg-slate-100 dark:bg-slate-800"></div>
 
-            <button
-              onClick={() => setIsSelectionMode(!isSelectionMode)}
-              className={`p-1.5 rounded-lg transition-colors flex items-center gap-2 border ${isSelectionMode
-                ? 'bg-primary/10 border-primary text-primary'
-                : 'text-slate-400 border-transparent hover:bg-slate-100 dark:hover:bg-slate-800'
-                }`}
-            >
-              <span className="material-icons-outlined text-xl">{isSelectionMode ? 'check_circle' : 'library_add_check'}</span>
-              <span className="text-xs font-medium hidden md:block">{isSelectionMode ? 'Concluir Seleção' : 'Selecionar'}</span>
-            </button>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 auto-rows-[200px]">
-            {filteredPhotos.map((photo: any) => (
-              <div
-                key={photo.id}
-                onClick={() => {
-                  if (isSelectionMode) {
-                    toggleSelection(photo.id);
-                  } else {
-                    onPhotoClick(photo);
-                  }
-                }}
-                className={`rounded-lg overflow-hidden group relative cursor-pointer bg-slate-100 dark:bg-slate-800 flex items-center justify-center transition-all ${isSelectionMode && selectedIds.has(photo.id) ? 'ring-4 ring-primary ring-inset' : ''
-                  } ${photo.media_type === 'video' ? 'col-span-2 row-span-2 md:col-span-1 md:row-span-1 lg:col-span-2 lg:row-span-2 aspect-video' : ''
+              <button
+                onClick={() => setIsSelectionMode(!isSelectionMode)}
+                className={`p-1.5 rounded-lg transition-colors flex items-center gap-2 border ${isSelectionMode
+                  ? 'bg-primary/10 border-primary text-primary'
+                  : 'text-slate-400 border-transparent hover:bg-slate-100 dark:hover:bg-slate-800'
                   }`}
               >
-                <img
-                  src={photo.src}
-                  alt={photo.alt || photo.title}
-                  className={`w-full h-full object-cover transition-transform duration-700 ${isSelectionMode ? '' : 'group-hover:scale-105'
-                    }`}
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = 'https://via.placeholder.com/400x400?text=Imagem+N%C3%A3o+Encontrada';
+                <span className="material-icons-outlined text-xl">{isSelectionMode ? 'check_circle' : 'library_add_check'}</span>
+                <span className="text-xs font-medium hidden md:block">{isSelectionMode ? 'Concluir Seleção' : 'Selecionar'}</span>
+              </button>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 auto-rows-[200px]">
+              {groupedPhotos[dateKey].map((photo: any) => (
+                <div
+                  key={photo.id}
+                  onClick={() => {
+                    if (isSelectionMode) {
+                      toggleSelection(photo.id);
+                    } else {
+                      onPhotoClick(photo);
+                    }
                   }}
-                />
+                  className={`rounded-lg overflow-hidden group relative cursor-pointer bg-slate-100 dark:bg-slate-800 flex items-center justify-center transition-all ${isSelectionMode && selectedIds.has(photo.id) ? 'ring-4 ring-primary ring-inset' : ''
+                    } ${photo.media_type === 'video' ? 'col-span-2 row-span-2 md:col-span-1 md:row-span-1 lg:col-span-2 lg:row-span-2 aspect-video' : ''
+                    }`}
+                >
+                  <img
+                    src={photo.src}
+                    alt={photo.alt || photo.title}
+                    className={`w-full h-full object-cover transition-transform duration-700 ${isSelectionMode ? '' : 'group-hover:scale-105'
+                      }`}
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = 'https://via.placeholder.com/400x400?text=Imagem+N%C3%A3o+Encontrada';
+                    }}
+                  />
 
-                {/* Selection Checkbox (always visible in selection mode, or on hover) */}
-                {isSelectionMode && (
-                  <div className={`absolute top-3 left-3 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${selectedIds.has(photo.id) ? 'bg-primary border-primary' : 'bg-black/20 border-white'
-                    }`}>
-                    {selectedIds.has(photo.id) && <span className="material-icons text-white text-[16px]">check</span>}
-                  </div>
-                )}
-
-                {!isSelectionMode && (
-                  <>
-                    {/* Gradient Overlay for Text */}
-                    <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
-                      <p className="text-white text-xs font-medium truncate">{photo.title}</p>
+                  {/* Selection Checkbox */}
+                  {isSelectionMode && (
+                    <div className={`absolute top-3 left-3 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${selectedIds.has(photo.id) ? 'bg-primary border-primary' : 'bg-black/20 border-white'
+                      }`}>
+                      {selectedIds.has(photo.id) && <span className="material-icons text-white text-[16px]">check</span>}
                     </div>
+                  )}
 
-                    {/* Video Play Icon Overlay */}
-                    {photo.media_type === 'video' && (
-                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <div className="bg-black/30 backdrop-blur-sm p-3 rounded-full flex items-center justify-center group-hover:bg-primary/80 transition-colors">
-                          <span className="material-icons text-white text-3xl">play_arrow</span>
-                        </div>
+                  {!isSelectionMode && (
+                    <>
+                      <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+                        <p className="text-white text-xs font-medium truncate">{photo.title}</p>
                       </div>
-                    )}
-                  </>
-                )}
 
-                {/* Selection Overlay */}
-                {isSelectionMode && !selectedIds.has(photo.id) && (
-                  <div className="absolute inset-0 bg-black/5 opacity-0 hover:opacity-100 transition-opacity"></div>
-                )}
-              </div>
-            ))}
+                      {photo.media_type === 'video' && (
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                          <div className="bg-black/30 backdrop-blur-sm p-3 rounded-full flex items-center justify-center group-hover:bg-primary/80 transition-colors">
+                            <span className="material-icons text-white text-3xl">play_arrow</span>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        ))
+      ) : (
+        <section className="mt-20 text-center">
+          <div className="w-20 h-20 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-300">
+            <span className="material-icons text-4xl">photo_library</span>
           </div>
+          <h3 className="text-lg font-bold text-slate-700 dark:text-slate-200">Sua galeria está vazia</h3>
+          <p className="text-slate-400">Comece enviando algumas fotos ou vídeos.</p>
         </section>
       )}
-
-      {/* Today Section (Demo) */}
-      <section className="mb-12">
-        <div className="flex items-center gap-4 mb-4 sticky top-0 bg-white/95 dark:bg-background-dark/95 py-3 z-[5]">
-          <h3 className="text-base font-semibold text-slate-700 dark:text-slate-200">Hoje <span className="text-slate-400 font-normal ml-2">• Londres, UK</span></h3>
-          <div className="h-px flex-1 bg-slate-100 dark:bg-slate-800"></div>
-          <button className="text-slate-400 hover:text-primary transition-colors">
-            <span className="material-icons-outlined text-xl">check_circle_outline</span>
-          </button>
-        </div>
-        <p className="text-sm text-slate-400 mb-4 italic">Fotos de demonstração</p>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 auto-rows-[200px]">
-          {TODAY_PHOTOS.map((photo) => (
-            <div
-              key={photo.id}
-              onClick={() => onPhotoClick(photo)}
-              className={`rounded-lg overflow-hidden group relative cursor-pointer ${photo.aspect === 'wide' ? 'col-span-2' :
-                photo.aspect === 'tall' ? 'row-span-2' : ''
-                }`}
-            >
-              <img
-                src={photo.src}
-                alt={photo.alt}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-              />
-              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors"></div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Yesterday Section */}
-      <section className="mb-12">
-        <div className="flex items-center gap-4 mb-4 sticky top-0 bg-white/95 dark:bg-background-dark/95 py-3 z-[5]">
-          <h3 className="text-base font-semibold text-slate-700 dark:text-slate-200">Ontem <span className="text-slate-400 font-normal ml-2">• Brighton, UK</span></h3>
-          <div className="h-px flex-1 bg-slate-100 dark:bg-slate-800"></div>
-          <button className="text-slate-400 hover:text-primary transition-colors">
-            <span className="material-icons-outlined text-xl">check_circle_outline</span>
-          </button>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 auto-rows-[200px]">
-          {YESTERDAY_PHOTOS.map((photo) => (
-            <div
-              key={photo.id}
-              onClick={() => onPhotoClick(photo)}
-              className={`rounded-lg overflow-hidden group relative cursor-pointer ${photo.aspect === 'wide' ? 'col-span-2' : ''
-                }`}
-            >
-              <img
-                src={photo.src}
-                alt={photo.alt}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-              />
-              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors"></div>
-            </div>
-          ))}
-        </div>
-      </section>
 
       {/* Location Preview (Static) */}
       <section className="mb-12">

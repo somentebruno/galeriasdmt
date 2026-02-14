@@ -4,6 +4,7 @@ import { useDropzone } from 'react-dropzone';
 import { supabase } from '../lib/supabase';
 import { uploadToHostinger, getYoutubeID, getVideoThumbnail } from '../utils/uploadHandler';
 import Button from './UI/Button';
+import exifr from 'exifr';
 
 
 // Cloudinary Configuration (Unsigned Upload)
@@ -23,6 +24,9 @@ interface UploadItem {
     progress: number;
     error?: string;
     preview: string;
+    taken_at?: string;
+    latitude?: number;
+    longitude?: number;
 }
 
 const UploadModal: React.FC<UploadModalProps> = ({ onClose, onSuccess }) => {
@@ -141,6 +145,32 @@ const UploadModal: React.FC<UploadModalProps> = ({ onClose, onSuccess }) => {
 
 
 
+                // 2. Extract Metadata (Exif)
+                let takenAt = new Date().toISOString();
+                let lat = null;
+                let lng = null;
+
+                try {
+                    const metadata = await exifr.parse(fileToUpload, {
+                        pick: ['DateTimeOriginal', 'latitude', 'longitude'],
+                        reviveValues: true
+                    });
+                    
+                    if (metadata) {
+                        if (metadata.DateTimeOriginal) {
+                            takenAt = (metadata.DateTimeOriginal instanceof Date) 
+                                ? metadata.DateTimeOriginal.toISOString() 
+                                : new Date(metadata.DateTimeOriginal).toISOString();
+                        }
+                        if (metadata.latitude) lat = metadata.latitude;
+                        if (metadata.longitude) lng = metadata.longitude;
+                        
+                        console.log(`[Metadata] ${originalName}: Tirada em ${takenAt}`);
+                    }
+                } catch (metaErr) {
+                    console.warn(`[Metadata] Falha ao ler Exif de ${originalName}:`, metaErr);
+                }
+
                 // 2. Upload to Hostinger
                 newFiles[i].status = 'uploading';
                 setFiles([...newFiles]);
@@ -160,7 +190,10 @@ const UploadModal: React.FC<UploadModalProps> = ({ onClose, onSuccess }) => {
                         title: title,
                         media_type: 'image',
                         aspect: aspect,
-                        storage_path: null // Important: External storage
+                        storage_path: null, // Important: External storage
+                        taken_at: takenAt,
+                        latitude: lat,
+                        longitude: lng
                     });
 
                 if (dbError) throw dbError;
