@@ -1,10 +1,29 @@
 import * as React from 'react';
 import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
-import heic2any from 'heic2any';
+import { FFmpeg } from '@ffmpeg/ffmpeg';
+import { fetchFile, toBlobURL } from '@ffmpeg/util';
 import { supabase } from '../lib/supabase';
 import { uploadToHostinger, getYoutubeID, getVideoThumbnail } from '../utils/uploadHandler';
 import Button from './UI/Button';
+
+// Instância global para não recarregar a cada arquivo
+let ffmpegInstance: FFmpeg | null = null;
+
+const loadFFmpeg = async () => {
+    if (ffmpegInstance) return ffmpegInstance;
+    
+    const ffmpeg = new FFmpeg();
+    const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
+    
+    await ffmpeg.load({
+        coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+        wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+    });
+    
+    ffmpegInstance = ffmpeg;
+    return ffmpeg;
+};
 
 interface UploadModalProps {
     onClose: () => void;
@@ -56,7 +75,6 @@ const UploadModal: React.FC<UploadModalProps> = ({ onClose, onSuccess }) => {
             'image/heic-sequence': ['.heic'],
             'image/heif-sequence': ['.heif']
         }
-
     });
 
     const removeFile = (index: number) => {
@@ -88,68 +106,46 @@ const UploadModal: React.FC<UploadModalProps> = ({ onClose, onSuccess }) => {
             const originalName = fileToUpload.name;
 
             try {
-                // 1. Convert HEIC/HEIF if needed
-                const fileName = fileToUpload.name.toLowerCase();
-                const isHeic = fileName.endsWith('.heic') || fileName.endsWith('.heif') || fileToUpload.type.includes('heic') || fileToUpload.type.includes('heif');
+                // 1. Convert HEIC/HEIF if needed using FFmpeg
+                const fileName = originalName.toLowerCase();
+                const isHeic = fileName.endsWith('.heic') || fileName.endsWith('.heif') || 
+                              fileToUpload.type.includes('heic') || fileToUpload.type.includes('heif');
 
                 if (isHeic) {
                     newFiles[i].status = 'converting';
                     setFiles([...newFiles]);
                     
                     try {
-                        console.log(`[HEIC] Processando ${originalName}...`);
-                        console.log(`[HEIC] MIME Type original: ${fileToUpload.type}, Tamanho: ${(fileToUpload.size / 1024 / 1024).toFixed(2)} MB`);
+                        console.log(`[FFmpeg] Preparando conversão de ${originalName}`);
+                        const ffmpeg = await loadFFmpeg();
                         
-                        const buffer = await fileToUpload.arrayBuffer();
-                        const blobToConvert = new Blob([buffer], { type: 'image/heic' });
+                        // Escreve o arquivo na memória do FFmpeg
+                        const inputName = 'input.heic';
+                        const outputName = 'output.jpg';
+                        await ffmpeg.writeFile(inputName, await fetchFile(fileToUpload));
 
-                        let resultBlob: Blob;
-                        try {
-                            // Tentativa 1: JPEG com 'multiple: true' (resolve erros de container Apple)
-                            console.log(`[HEIC] Tentativa 1: JPEG (com multiple: true)`);
-                            const converted = await (heic2any as any)({
-                                blob: blobToConvert,
-                                toType: 'image/jpeg',
-                                quality: 0.8,
-                                multiple: true // CRÍTICO: Resolve problemas com Burst/Live Photos
-                            });
-                            resultBlob = Array.isArray(converted) ? converted[0] : converted;
-                        } catch (e1) {
-                            console.warn(`[HEIC] Falha na tentativa 1:`, e1);
-                            
-                            // Tentativa 2: PNG como fallback extremo
-                            console.log(`[HEIC] Tentativa 2: Fallback para PNG`);
-                            const convertedPng = await (heic2any as any)({
-                                blob: blobToConvert,
-                                toType: 'image/png',
-                                multiple: true
-                            });
-                            const pngBlob = Array.isArray(convertedPng) ? convertedPng[0] : convertedPng;
-                            
-                            console.log(`[HEIC] Convertendo PNG intermediário para JPEG via Canvas...`);
-                            resultBlob = await new Promise<Blob>((resolve, reject) => {
-                                const img = new Image();
-                                img.onload = () => {
-                                    const canvas = document.createElement('canvas');
-                                    canvas.width = img.width;
-                                    canvas.height = img.height;
-                                    const ctx = canvas.getContext('2d');
-                                    ctx?.drawImage(img, 0, 0);
-                                    canvas.toBlob((b) => b ? resolve(b) : reject(new Error('Canvas conversion failed')), 'image/jpeg', 0.8);
-                                    URL.revokeObjectURL(img.src);
-                                };
-                                img.onerror = () => reject(new Error('Fail to load converted image'));
-                                img.src = URL.createObjectURL(pngBlob);
-                            });
-                        }
+                        // Executa o comando de conversão (Motor Profissional)
+                        // -i: input, vframes 1: pega o primeiro frame (resolve Live Photos)
+                        await ffmpeg.exec(['-i', inputName, '-vframes', '1', outputName]);
 
+                        // Lê o arquivo convertido
+                        const data = await ffmpeg.readFile(outputName);
+                        // Convertendo de forma segura para Blob (tratando Uint8Array/SharedArrayBuffer)
+                        const resultBlob = new Blob([data as any], { type: 'image/jpeg' });
+                        
                         fileToUpload = new File([resultBlob], originalName.replace(/\.(heic|heif)$/i, '.jpg'), { type: 'image/jpeg' });
-                        console.log(`[HEIC] Sucesso total: ${fileToUpload.name}`);
+                        
+                        // Limpa a memória
+                        await ffmpeg.deleteFile(inputName);
+                        await ffmpeg.deleteFile(outputName);
+                        
+                        console.log(`[FFmpeg] Conversão concluída: ${fileToUpload.name}`);
                     } catch (convErr: any) {
-                        console.error('[HEIC] Erro fatal:', convErr);
-                        throw new Error(`Este arquivo HEIC específico (HDR ou Live) não é suportado pelo conversor web. Tente converter para JPG antes de subir.`);
+                        console.error('[FFmpeg] Erro na conversão:', convErr);
+                        throw new Error(`O motor FFmpeg não conseguiu processar este arquivo. Tente convertê-lo manualmente.`);
                     }
                 }
+
 
 
 
