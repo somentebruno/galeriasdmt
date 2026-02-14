@@ -100,8 +100,9 @@ const UploadModal: React.FC<UploadModalProps> = ({ onClose, onSuccess }) => {
                         const convertedBlob = await heic2any({
                             blob: blob,
                             toType: 'image/jpeg',
-                            quality: 0.6
+                            quality: 0.8
                         });
+
 
                         const result = Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob;
                         fileToUpload = new File([result], originalName.replace(/\.(heic|heif)$/i, '.jpg'), { type: 'image/jpeg' });
