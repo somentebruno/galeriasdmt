@@ -50,7 +50,7 @@ const PhotosView: React.FC<PhotosViewProps> = ({ onPhotoClick, refreshKey, searc
         .from('photos')
         .select('*')
         .is('deleted_at', null)
-        .order('taken_at', { ascending: false });
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
       const formattedPhotos = (data || []).map((p: any) => ({
@@ -230,8 +230,16 @@ const PhotosView: React.FC<PhotosViewProps> = ({ onPhotoClick, refreshKey, searc
 
   // Group photos by date
   const groupedPhotos = filteredPhotos.reduce((groups: { [key: string]: Photo[] }, photo) => {
-    const date = photo.date || (photo as any).taken_at || (photo as any).created_at || new Date().toISOString();
-    const dateKey = date.split('T')[0];
+    // Priority: taken_at > created_at > fallback now
+    const rawDate = (photo as any).taken_at || (photo as any).created_at || (photo as any).date || new Date().toISOString();
+    
+    let dateKey = 'Desconhecido';
+    try {
+      dateKey = rawDate.split('T')[0];
+    } catch (e) {
+      console.warn("Invalid date format:", rawDate);
+    }
+
     if (!groups[dateKey]) {
       groups[dateKey] = [];
     }
@@ -316,38 +324,56 @@ const PhotosView: React.FC<PhotosViewProps> = ({ onPhotoClick, refreshKey, searc
         </Section>
       )}
 
-      {/* Dynamic Grouped Photos Sections */}
-      {sortedDateKeys.length > 0 ? (
-        sortedDateKeys.map((dateKey) => (
-          <section key={dateKey} className="mb-12">
-            <div className="flex items-center gap-4 mb-4 sticky top-0 bg-white/95 dark:bg-background-dark/95 py-3 z-[5]">
-              <h3 className="text-base font-semibold text-slate-700 dark:text-slate-200">
-                {formatDateHeader(dateKey)}
-              </h3>
-              <div className="h-px flex-1 bg-slate-100 dark:bg-slate-800"></div>
+      {/* Global Gallery Header */}
+      <div className="flex items-center justify-between mt-12 mb-6 border-b border-slate-100 dark:border-slate-800 pb-4">
+        <div className="flex items-center gap-4">
+          <h2 className="text-xl font-bold text-slate-800 dark:text-white">
+            {searchTerm ? `Resultados para "${searchTerm}"` : 'Sua Galeria'}
+          </h2>
+          {uploadedPhotos.length > 0 && (
+            <span className="text-xs font-semibold bg-primary/10 text-primary px-2 py-1 rounded-full">
+              {uploadedPhotos.length} {uploadedPhotos.length === 1 ? 'item' : 'itens'}
+            </span>
+          )}
+        </div>
 
-              <button
-                onClick={() => setIsSelectionMode(!isSelectionMode)}
-                className={`p-1.5 rounded-lg transition-colors flex items-center gap-2 border ${isSelectionMode
-                  ? 'bg-primary/10 border-primary text-primary'
-                  : 'text-slate-400 border-transparent hover:bg-slate-100 dark:hover:bg-slate-800'
-                  }`}
-              >
-                <span className="material-icons-outlined text-xl">{isSelectionMode ? 'check_circle' : 'library_add_check'}</span>
-                <span className="text-xs font-medium hidden md:block">{isSelectionMode ? 'Concluir Seleção' : 'Selecionar'}</span>
-              </button>
-
+        <div className="flex items-center gap-2">
+            {/* Sync Button */}
             {uploadedPhotos.some(p => !(p as any).taken_at && p.media_type === 'image') && !isSelectionMode && (
                 <button
                   onClick={syncOldPhotos}
                   disabled={isProcessing}
-                  className="p-1.5 rounded-lg transition-colors flex items-center gap-2 border border-amber-200 bg-amber-50 text-amber-600 hover:bg-amber-100 dark:bg-amber-900/20 dark:border-amber-900/30 dark:text-amber-400"
-                  title="Sincronizar datas das fotos antigas"
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-600 hover:bg-amber-100 transition-colors text-sm font-medium dark:bg-amber-900/20 dark:border-amber-900/30 dark:text-amber-400"
                 >
-                  <span className={`material-icons-outlined text-xl ${isProcessing ? 'animate-spin' : ''}`}>sync</span>
-                  <span className="text-xs font-medium hidden md:block">Sincronizar Datas</span>
+                  <span className={`material-icons text-lg ${isProcessing ? 'animate-spin' : ''}`}>sync</span>
+                  <span className="hidden md:inline">Sincronizar Datas</span>
                 </button>
-              )}
+            )}
+
+            {/* Selection Mode Button */}
+            {uploadedPhotos.length > 0 && (
+              <button
+                onClick={() => setIsSelectionMode(!isSelectionMode)}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all text-sm font-medium ${isSelectionMode 
+                  ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20' 
+                  : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-primary/50'}`}
+              >
+                <span className="material-icons text-lg">{isSelectionMode ? 'check_circle' : 'library_add_check'}</span>
+                <span className="hidden md:inline">{isSelectionMode ? 'Concluir' : 'Selecionar'}</span>
+              </button>
+            )}
+        </div>
+      </div>
+
+      {/* Dynamic Grouped Photos Sections */}
+      {sortedDateKeys.length > 0 ? (
+        sortedDateKeys.map((dateKey) => (
+          <section key={dateKey} className="mb-12">
+            <div className="flex items-center gap-4 mb-4 sticky top-0 bg-white/95 dark:bg-slate-900/95 py-3 z-[5] backdrop-blur-sm">
+              <h3 className="text-base font-semibold text-slate-700 dark:text-slate-200">
+                {formatDateHeader(dateKey)}
+              </h3>
+              <div className="h-px flex-1 bg-slate-100 dark:bg-slate-800"></div>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 auto-rows-[200px]">
               {groupedPhotos[dateKey].map((photo: any) => (
@@ -403,12 +429,17 @@ const PhotosView: React.FC<PhotosViewProps> = ({ onPhotoClick, refreshKey, searc
           </section>
         ))
       ) : (
-        <section className="mt-20 text-center">
-          <div className="w-20 h-20 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-300">
-            <span className="material-icons text-4xl">photo_library</span>
+        <section className="mt-10 mb-20 text-center py-20 bg-slate-50 dark:bg-slate-800/20 rounded-2xl border-2 border-dashed border-slate-100 dark:border-slate-800">
+          <div className="w-16 h-16 bg-white dark:bg-slate-800 rounded-full shadow-sm flex items-center justify-center mx-auto mb-4 text-slate-300">
+            <span className="material-icons text-3xl">photo_library</span>
           </div>
           <h3 className="text-lg font-bold text-slate-700 dark:text-slate-200">Sua galeria está vazia</h3>
-          <p className="text-slate-400">Comece enviando algumas fotos ou vídeos.</p>
+          <p className="text-slate-400 max-w-xs mx-auto text-sm mt-1">
+            Parece que você ainda não tem fotos. Tente fazer um upload ou verifique se está logado.
+          </p>
+          <Button variant="primary" className="mt-6" onClick={() => fetchPhotos()} icon="refresh">
+            Atualizar Galeria
+          </Button>
         </section>
       )}
 
