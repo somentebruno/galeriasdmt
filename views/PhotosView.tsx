@@ -179,15 +179,17 @@ const PhotosView: React.FC<PhotosViewProps> = ({ onPhotoClick, refreshKey, searc
         const blob = await response.blob();
         
         const metadata = await exifr.parse(blob, {
-          pick: ['DateTimeOriginal', 'latitude', 'longitude'],
+          pick: ['DateTimeOriginal', 'CreateDate', 'ModifyDate', 'latitude', 'longitude'],
           reviveValues: true
         });
 
         const updates: any = {};
-        if (metadata?.DateTimeOriginal) {
-          updates.taken_at = (metadata.DateTimeOriginal instanceof Date) 
-            ? metadata.DateTimeOriginal.toISOString() 
-            : new Date(metadata.DateTimeOriginal).toISOString();
+        const exifDate = metadata?.DateTimeOriginal || metadata?.CreateDate || metadata?.ModifyDate;
+        
+        if (exifDate) {
+          updates.taken_at = (exifDate instanceof Date) 
+            ? exifDate.toISOString() 
+            : new Date(exifDate).toISOString();
         } else {
           // If no exif, use created_at to avoid re-syncing constantly
           updates.taken_at = (photo as any).created_at;

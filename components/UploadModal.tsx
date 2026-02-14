@@ -152,15 +152,16 @@ const UploadModal: React.FC<UploadModalProps> = ({ onClose, onSuccess }) => {
 
                 try {
                     const metadata = await exifr.parse(fileToUpload, {
-                        pick: ['DateTimeOriginal', 'latitude', 'longitude'],
+                        pick: ['DateTimeOriginal', 'CreateDate', 'ModifyDate', 'latitude', 'longitude'],
                         reviveValues: true
                     });
                     
                     if (metadata) {
-                        if (metadata.DateTimeOriginal) {
-                            takenAt = (metadata.DateTimeOriginal instanceof Date) 
-                                ? metadata.DateTimeOriginal.toISOString() 
-                                : new Date(metadata.DateTimeOriginal).toISOString();
+                        const exifDate = metadata.DateTimeOriginal || metadata.CreateDate || metadata.ModifyDate;
+                        if (exifDate) {
+                            takenAt = (exifDate instanceof Date) 
+                                ? exifDate.toISOString() 
+                                : new Date(exifDate).toISOString();
                         }
                         if (metadata.latitude) lat = metadata.latitude;
                         if (metadata.longitude) lng = metadata.longitude;
