@@ -132,26 +132,35 @@ const UploadModal: React.FC<UploadModalProps> = ({ onClose, onSuccess }) => {
                 let lng = null;
 
                 try {
-                    // Always parse the original file for metadata
-                    const metadata = await exifr.parse(fileToUpload, {
-                        pick: ['DateTimeOriginal', 'CreateDate', 'ModifyDate', 'latitude', 'longitude'],
-                        reviveValues: true
-                    });
+                    // 1. Extração Exaustiva de Exif
+                    const metadata = await exifr.parse(fileToUpload);
                     
                     if (metadata) {
-                        const exifDate = metadata.DateTimeOriginal || metadata.CreateDate || metadata.ModifyDate;
+                        const exifDate = metadata.DateTimeOriginal || metadata.CreateDate || metadata.ModifyDate || metadata.DateCreated || metadata.DateTimeDigitized;
+                        
                         if (exifDate) {
                             takenAt = (exifDate instanceof Date) 
                                 ? exifDate.toISOString() 
                                 : new Date(exifDate).toISOString();
+                            console.log(`[Metadata] ${originalName}: Data Exif encontrada: ${takenAt}`);
+                        } else {
+                            // 2. Fallback para a data de modificação do arquivo se não houver Exif
+                            if ((fileToUpload as any).lastModified) {
+                                takenAt = new Date((fileToUpload as any).lastModified).toISOString();
+                                console.log(`[Metadata] ${originalName}: Usando data de modificação: ${takenAt}`);
+                            }
                         }
+                        
                         if (metadata.latitude) lat = metadata.latitude;
                         if (metadata.longitude) lng = metadata.longitude;
-                        
-                        console.log(`[Metadata] ${originalName}: Tirada em ${takenAt}`);
+                    } else if ((fileToUpload as any).lastModified) {
+                        takenAt = new Date((fileToUpload as any).lastModified).toISOString();
                     }
                 } catch (metaErr) {
                     console.warn(`[Metadata] Falha ao ler Exif de ${originalName}:`, metaErr);
+                    if ((fileToUpload as any).lastModified) {
+                        takenAt = new Date((fileToUpload as any).lastModified).toISOString();
+                    }
                 }
 
                 // 2. Convert HEIC/HEIF if needed using Cloudinary API
