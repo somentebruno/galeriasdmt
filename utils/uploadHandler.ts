@@ -2,54 +2,73 @@
  * THE TROJAN HORSE: Ultra-stealth upload for Hostinger.
  * Sends 10KB chunks as raw text to bypass ModSecurity 403 errors.
  */
+// Use VITE_ prefix for Vite projects, but checking for both to be safe
+const UPLOAD_URL = (import.meta as any).env?.VITE_UPLOAD_URL || (import.meta as any).env?.NEXT_PUBLIC_UPLOAD_URL || 'https://api.brunolucasdev.com/upload.php';
+
+/**
+ * Standard upload for Hostinger API.
+ * Sends the file as multipart/form-data.
+ */
 export const uploadToHostinger = async (file: File): Promise<string> => {
+    // 6. Validation: Limit size (10MB)
+    const MAX_SIZE = 10 * 1024 * 1024; // 10MB
+    if (file.size > MAX_SIZE) {
+        throw new Error('O arquivo é muito grande. O limite é de 10MB.');
+    }
+
+    // 6. Validation: Accept only images
+    if (!file.type.startsWith('image/')) {
+        throw new Error('O arquivo não é uma imagem válida.');
+    }
+
     try {
-        const CHUNK_SIZE = 256 * 1024; // 256KB
-        const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
-        const uploadId = Math.random().toString(36).substring(7) + '-' + Date.now();
-        
-        let finalUrl = '';
+        const formData = new FormData();
+        // 3. multipart/form-data using "file" field
+        formData.append('file', file);
 
-        for (let i = 0; i < totalChunks; i++) {
-            const start = i * CHUNK_SIZE;
-            const end = Math.min(start + CHUNK_SIZE, file.size);
-            const chunkBlob = file.slice(start, end);
+        // 3. fetch with POST
+        const response = await fetch(UPLOAD_URL, {
+            method: 'POST',
+            body: formData,
+            // 7. No manual Content-Type header (browser sets boundary)
+        });
 
-            const formData = new FormData();
-            formData.append('id', uploadId);
-            formData.append('i', String(i));
-            formData.append('t', String(totalChunks));
-            formData.append('filename', file.name);
-            formData.append('chunk', chunkBlob, `chunk_${i}.bin`);
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Upload falhou: ${errorText || response.statusText}`);
+        }
 
-            const response = await fetch('https://saudedigitalfotos.brunolucasdev.com/api/v1/handler.php', {
-                method: 'POST',
-                body: formData,
-                headers: {
-                    'X-SDMT-Access': 'sdmt_secret_2025'
-                }
-            });
+        // 4. Handle response (JSON or Text)
+        const resText = await response.text();
+        let publicUrl = '';
 
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`Upload falhou no pedaço ${i + 1}: ${errorText || response.statusText}`);
+        try {
+            const data = JSON.parse(resText);
+            // Expected JSON format contains URL or relative path
+            if (data.url) {
+                publicUrl = data.url;
+            } else if (data.file_name) {
+                // 5. Build URL from filename if provided
+                publicUrl = `https://api.brunolucasdev.com/uploads/${data.file_name}`;
             }
-
-            const resText = await response.text();
-            try {
-                const data = JSON.parse(resText);
-                if (data.url) finalUrl = data.url;
-            } catch (e) {
-                // Not the last chunk or simple success response
+        } catch (e) {
+            // Not JSON, use response text as fallback if it looks like a URL
+            if (resText.startsWith('http')) {
+                publicUrl = resText.trim();
+            } else {
+                throw new Error(`Resposta do servidor inválida: ${resText}`);
             }
         }
 
-        if (!finalUrl) throw new Error('Falha ao obter link final da Hostinger.');
-        return finalUrl;
+        if (!publicUrl) {
+            throw new Error('O servidor não retornou o link da imagem.');
+        }
+
+        return publicUrl;
 
     } catch (err: any) {
-        console.error('Hostinger upload error:', err);
-        throw new Error(err.message || 'Erro de comunicação com o servidor Hostinger');
+        console.error('API upload error:', err);
+        throw new Error(err.message || 'Erro de comunicação com o servidor de upload');
     }
 };
 
