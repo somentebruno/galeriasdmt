@@ -88,3 +88,28 @@ export const getYoutubeID = (url: string): string | null => {
 export const getVideoThumbnail = (videoId: string): string => {
     return `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
 };
+/**
+ * Deletes a file from Hostinger storage via API.
+ */
+export const deleteFromHostinger = async (url: string): Promise<void> => {
+    const DELETE_URL = 'https://api.brunolucasdev.com/delete.php';
+    const API_KEY = (import.meta as any).env?.VITE_DELETE_API_KEY || 'sua_chave_de_deletar_aqui';
+
+    try {
+        const response = await fetch(DELETE_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${API_KEY}`
+            },
+            body: JSON.stringify({ url })
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`Falha ao deletar arquivo na Hostinger: ${errorText}`);
+        }
+    } catch (err) {
+        console.error('Erro ao chamar API de deleção:', err);
+    }
+};

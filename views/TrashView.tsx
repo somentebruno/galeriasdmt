@@ -3,6 +3,7 @@ import { Photo } from '../types';
 import Section from '../components/UI/Section';
 import Button from '../components/UI/Button';
 import { supabase } from '../lib/supabase';
+import { deleteFromHostinger } from '../utils/uploadHandler';
 
 interface TrashViewProps {
     onPhotoClick: (photo: Photo) => void;
@@ -70,9 +71,12 @@ const TrashView: React.FC<TrashViewProps> = ({ onPhotoClick, refreshKey, onResto
 
                 if (storageError) {
                     console.error('Erro ao deletar do storage:', storageError);
-                    // We continue to delete from DB even if storage fails, or we could stop.
-                    // Usually better to try to clean up DB so we don't have broken links.
                 }
+            }
+
+            // 1.1 Delete from Hostinger
+            if (photo.src.includes('brunolucasdev.com')) {
+                await deleteFromHostinger(photo.src);
             }
 
             // 2. Delete from DB
@@ -102,15 +106,19 @@ const TrashView: React.FC<TrashViewProps> = ({ onPhotoClick, refreshKey, onResto
             // 1. Fetch all items to be deleted to get their storage paths
             const { data: itemsToDelete, error: fetchError } = await supabase
                 .from('photos')
-                .select('storage_path')
+                .select('storage_path, url')
                 .not('deleted_at', 'is', null);
 
             if (fetchError) throw fetchError;
 
-            // 2. Extract paths
+            // 2. Extract paths and Hostinger URLs
             const pathsToDelete = itemsToDelete
                 ?.map(p => p.storage_path)
                 .filter(path => path !== null && path !== '') as string[];
+
+            const hostingerUrlsToDelete = itemsToDelete
+                ?.filter(p => p.url && p.url.includes('brunolucasdev.com'))
+                .map(p => p.url) as string[];
 
             // 3. Delete from Storage
             if (pathsToDelete && pathsToDelete.length > 0) {
@@ -120,6 +128,11 @@ const TrashView: React.FC<TrashViewProps> = ({ onPhotoClick, refreshKey, onResto
                     .remove(pathsToDelete);
 
                 if (storageError) console.error('Erro ao limpar storage:', storageError);
+            }
+
+            // 3.1 Delete from Hostinger
+            if (hostingerUrlsToDelete.length > 0) {
+                await Promise.all(hostingerUrlsToDelete.map(url => deleteFromHostinger(url)));
             }
 
             // 4. Delete from DB
