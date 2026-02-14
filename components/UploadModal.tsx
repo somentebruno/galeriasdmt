@@ -97,22 +97,58 @@ const UploadModal: React.FC<UploadModalProps> = ({ onClose, onSuccess }) => {
                     setFiles([...newFiles]);
                     
                     try {
-                        console.log(`Conversão HEIC: Iniciando ${originalName}...`);
-                        const convertedBlob = await (heic2any as any)({
-                            blob: fileToUpload,
-                            toType: 'image/jpeg',
-                            quality: 0.8
-                        });
+                        console.log(`[HEIC] Processando ${originalName}...`);
+                        
+                        // Garante que o blob tenha o tipo correto antes de passar para a biblioteca
+                        const buffer = await fileToUpload.arrayBuffer();
+                        const blobToConvert = new Blob([buffer], { type: 'image/heic' });
 
-                        const result = Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob;
-                        fileToUpload = new File([result], originalName.replace(/\.(heic|heif)$/i, '.jpg'), { type: 'image/jpeg' });
-                        console.log(`Conversão HEIC: Sucesso (${fileToUpload.name})`);
+                        let resultBlob: Blob;
+                        try {
+                            // Tenta conversão direta para JPEG (mais rápido)
+                            console.log(`[HEIC] Tentativa 1: Conversão direta para JPEG`);
+                            const converted = await (heic2any as any)({
+                                blob: blobToConvert,
+                                toType: 'image/jpeg',
+                                quality: 0.8
+                            });
+                            resultBlob = Array.isArray(converted) ? converted[0] : converted;
+                        } catch (e1) {
+                            console.warn(`[HEIC] Falha na tentativa 1 (JPEG):`, e1);
+                            // Tenta conversão para PNG como fallback (alguns arquivos libheif só aceitam exportar para PNG)
+                            console.log(`[HEIC] Tentativa 2: Fallback para PNG`);
+                            const convertedPng = await (heic2any as any)({
+                                blob: blobToConvert,
+                                toType: 'image/png'
+                            });
+                            const pngBlob = Array.isArray(convertedPng) ? convertedPng[0] : convertedPng;
+                            
+                            // Converte PNG para JPEG via Canvas para garantir compatibilidade com o backend
+                            console.log(`[HEIC] Convertendo PNG intermediário para JPEG via Canvas...`);
+                            resultBlob = await new Promise<Blob>((resolve, reject) => {
+                                const img = new Image();
+                                img.onload = () => {
+                                    const canvas = document.createElement('canvas');
+                                    canvas.width = img.width;
+                                    canvas.height = img.height;
+                                    const ctx = canvas.getContext('2d');
+                                    ctx?.drawImage(img, 0, 0);
+                                    canvas.toBlob((b) => b ? resolve(b) : reject(new Error('Canvas toBlob falhou')), 'image/jpeg', 0.8);
+                                    URL.revokeObjectURL(img.src);
+                                };
+                                img.onerror = () => reject(new Error('Falha ao carregar PNG convertido'));
+                                img.src = URL.createObjectURL(pngBlob);
+                            });
+                        }
+
+                        fileToUpload = new File([resultBlob], originalName.replace(/\.(heic|heif)$/i, '.jpg'), { type: 'image/jpeg' });
+                        console.log(`[HEIC] Sucesso: ${fileToUpload.name} (${(fileToUpload.size / 1024).toFixed(1)} KB)`);
                     } catch (convErr: any) {
-                        console.error('Erro HEIC:', convErr);
-                        throw new Error(`O arquivo HEIC é incompatível. Tente converter para JPG antes de subir.`);
+                        console.error('[HEIC] Erro crítico na conversão:', convErr);
+                        throw new Error(`Não foi possível converter esta foto do iPhone. Tente tirar um print ou converter para JPG no celular.`);
                     }
-
                 }
+
 
                 // 2. Upload to Hostinger
                 newFiles[i].status = 'uploading';
