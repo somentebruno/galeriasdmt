@@ -52,8 +52,11 @@ const UploadModal: React.FC<UploadModalProps> = ({ onClose, onSuccess }) => {
             'image/png': [],
             'image/webp': [],
             'image/heic': ['.heic'],
-            'image/heif': ['.heif']
+            'image/heif': ['.heif'],
+            'image/heic-sequence': ['.heic'],
+            'image/heif-sequence': ['.heif']
         }
+
     });
 
     const removeFile = (index: number) => {
@@ -94,22 +97,21 @@ const UploadModal: React.FC<UploadModalProps> = ({ onClose, onSuccess }) => {
                     setFiles([...newFiles]);
                     
                     try {
-                        // Ensure we use a clean blob for heic2any
-                        const buffer = await fileToUpload.arrayBuffer();
-                        const blob = new Blob([buffer], { type: fileToUpload.type });
-                        const convertedBlob = await heic2any({
-                            blob: blob,
+                        console.log(`Conversão HEIC: Iniciando ${originalName}...`);
+                        const convertedBlob = await (heic2any as any)({
+                            blob: fileToUpload,
                             toType: 'image/jpeg',
                             quality: 0.8
                         });
 
-
                         const result = Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob;
                         fileToUpload = new File([result], originalName.replace(/\.(heic|heif)$/i, '.jpg'), { type: 'image/jpeg' });
+                        console.log(`Conversão HEIC: Sucesso (${fileToUpload.name})`);
                     } catch (convErr: any) {
-                        console.error('HEIC conversion failed:', convErr);
-                        throw new Error(`O arquivo HEIC é incompatível. Tente converter para JPG no celular antes de subir.`);
+                        console.error('Erro HEIC:', convErr);
+                        throw new Error(`O arquivo HEIC é incompatível. Tente converter para JPG antes de subir.`);
                     }
+
                 }
 
                 // 2. Upload to Hostinger
