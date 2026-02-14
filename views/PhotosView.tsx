@@ -178,10 +178,21 @@ const PhotosView: React.FC<PhotosViewProps> = ({ onPhotoClick, refreshKey, searc
         const response = await fetch(photo.src);
         const blob = await response.blob();
         
-        const metadata = await exifr.parse(blob);
+        const metadata = await exifr.parse(blob, {
+          tiff: true,
+          xmp: true,
+          exif: true,
+          gps: true,
+          reviveValues: true
+        });
 
         const updates: any = {};
-        const exifDate = metadata?.DateTimeOriginal || metadata?.CreateDate || metadata?.ModifyDate || metadata?.DateCreated || metadata?.DateTimeDigitized;
+        const exifDate = metadata?.DateTimeOriginal || 
+                        metadata?.CreateDate || 
+                        metadata?.ModifyDate || 
+                        metadata?.DateCreated || 
+                        metadata?.DateTimeDigitized ||
+                        metadata?.GPSDateStamp;
         
         if (exifDate) {
           updates.taken_at = (exifDate instanceof Date) 
@@ -191,7 +202,6 @@ const PhotosView: React.FC<PhotosViewProps> = ({ onPhotoClick, refreshKey, searc
           // If no exif, use created_at to avoid re-syncing constantly
           updates.taken_at = (photo as any).created_at;
         }
-
         if (metadata?.latitude) updates.latitude = metadata.latitude;
         if (metadata?.longitude) updates.longitude = metadata.longitude;
 

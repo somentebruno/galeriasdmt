@@ -132,32 +132,44 @@ const UploadModal: React.FC<UploadModalProps> = ({ onClose, onSuccess }) => {
                 let lng = null;
 
                 try {
-                    // 1. Extração Exaustiva de Exif
-                    const metadata = await exifr.parse(fileToUpload);
+                    // 1. Extração Agressiva de Exif
+                    console.log(`[Metadata] Analisando ${originalName}...`);
+                    const metadata = await exifr.parse(fileToUpload, {
+                        tiff: true,
+                        xmp: true,
+                        exif: true,
+                        gps: true,
+                        reviveValues: true
+                    });
                     
                     if (metadata) {
-                        const exifDate = metadata.DateTimeOriginal || metadata.CreateDate || metadata.ModifyDate || metadata.DateCreated || metadata.DateTimeDigitized;
+                        console.log(`[Metadata] Chaves encontradas em ${originalName}:`, Object.keys(metadata));
+                        // Buscamos em todos os campos possíveis de data conhecidos
+                        const exifDate = metadata.DateTimeOriginal || 
+                                       metadata.CreateDate || 
+                                       metadata.ModifyDate || 
+                                       metadata.DateCreated || 
+                                       metadata.DateTimeDigitized ||
+                                       metadata.GPSDateStamp; // Fallback para data do GPS
                         
                         if (exifDate) {
                             takenAt = (exifDate instanceof Date) 
                                 ? exifDate.toISOString() 
                                 : new Date(exifDate).toISOString();
-                            console.log(`[Metadata] ${originalName}: Data Exif encontrada: ${takenAt}`);
+                            console.log(`[Metadata] ${originalName}: Data REAL encontrada: ${takenAt}`);
                         } else {
-                            // 2. Fallback para a data de modificação do arquivo se não houver Exif
+                            // 2. Fallback para a data de modificação do arquivo se o Exif não tiver data
                             if ((fileToUpload as any).lastModified) {
                                 takenAt = new Date((fileToUpload as any).lastModified).toISOString();
-                                console.log(`[Metadata] ${originalName}: Usando data de modificação: ${takenAt}`);
+                                console.log(`[Metadata] ${originalName}: Sem data no Exif. Usando data do arquivo: ${takenAt}`);
                             }
                         }
                         
                         if (metadata.latitude) lat = metadata.latitude;
                         if (metadata.longitude) lng = metadata.longitude;
-                    } else if ((fileToUpload as any).lastModified) {
-                        takenAt = new Date((fileToUpload as any).lastModified).toISOString();
                     }
                 } catch (metaErr) {
-                    console.warn(`[Metadata] Falha ao ler Exif de ${originalName}:`, metaErr);
+                    console.warn(`[Metadata] Falha crítica ao ler Exif de ${originalName}:`, metaErr);
                     if ((fileToUpload as any).lastModified) {
                         takenAt = new Date((fileToUpload as any).lastModified).toISOString();
                     }
