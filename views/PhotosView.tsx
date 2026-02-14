@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import Button from '../components/UI/Button';
+import exifr from 'exifr';
 
 interface PhotosViewProps {
   onPhotoClick: (photo: Photo) => void;
@@ -159,6 +160,61 @@ const PhotosView: React.FC<PhotosViewProps> = ({ onPhotoClick, refreshKey, searc
     }
   };
 
+  const syncOldPhotos = async () => {
+    const unsynced = uploadedPhotos.filter(p => !(p as any).taken_at && p.media_type === 'image');
+    if (unsynced.length === 0) {
+      alert('Todas as fotos já estão sincronizadas!');
+      return;
+    }
+
+    if (!confirm(`Sincronizar datas de ${unsynced.length} fotos antigas? Isso pode levar algum tempo.`)) return;
+
+    setIsProcessing(true);
+    let successCount = 0;
+
+    for (const photo of unsynced) {
+      try {
+        console.log(`[Sync] Processando ${photo.title}...`);
+        const response = await fetch(photo.src);
+        const blob = await response.blob();
+        
+        const metadata = await exifr.parse(blob, {
+          pick: ['DateTimeOriginal', 'latitude', 'longitude'],
+          reviveValues: true
+        });
+
+        const updates: any = {};
+        if (metadata?.DateTimeOriginal) {
+          updates.taken_at = (metadata.DateTimeOriginal instanceof Date) 
+            ? metadata.DateTimeOriginal.toISOString() 
+            : new Date(metadata.DateTimeOriginal).toISOString();
+        } else {
+          // If no exif, use created_at to avoid re-syncing constantly
+          updates.taken_at = (photo as any).created_at;
+        }
+
+        if (metadata?.latitude) updates.latitude = metadata.latitude;
+        if (metadata?.longitude) updates.longitude = metadata.longitude;
+
+        const { error } = await supabase
+          .from('photos')
+          .update(updates)
+          .eq('id', photo.id);
+
+        if (error) throw error;
+        successCount++;
+        // Frequent updates for feedback
+        if (successCount % 5 === 0) fetchPhotos();
+      } catch (err) {
+        console.error(`[Sync] Falha ao sincronizar ${photo.id}:`, err);
+      }
+    }
+
+    alert(`Sincronização concluída! ${successCount} fotos atualizadas.`);
+    setIsProcessing(false);
+    fetchPhotos();
+  };
+
   // Helper to format date headers
   const formatDateHeader = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -280,6 +336,18 @@ const PhotosView: React.FC<PhotosViewProps> = ({ onPhotoClick, refreshKey, searc
                 <span className="material-icons-outlined text-xl">{isSelectionMode ? 'check_circle' : 'library_add_check'}</span>
                 <span className="text-xs font-medium hidden md:block">{isSelectionMode ? 'Concluir Seleção' : 'Selecionar'}</span>
               </button>
+
+            {uploadedPhotos.some(p => !(p as any).taken_at && p.media_type === 'image') && !isSelectionMode && (
+                <button
+                  onClick={syncOldPhotos}
+                  disabled={isProcessing}
+                  className="p-1.5 rounded-lg transition-colors flex items-center gap-2 border border-amber-200 bg-amber-50 text-amber-600 hover:bg-amber-100 dark:bg-amber-900/20 dark:border-amber-900/30 dark:text-amber-400"
+                  title="Sincronizar datas das fotos antigas"
+                >
+                  <span className={`material-icons-outlined text-xl ${isProcessing ? 'animate-spin' : ''}`}>sync</span>
+                  <span className="text-xs font-medium hidden md:block">Sincronizar Datas</span>
+                </button>
+              )}
             </div>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 auto-rows-[200px]">
               {groupedPhotos[dateKey].map((photo: any) => (

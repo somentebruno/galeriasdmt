@@ -23,6 +23,9 @@ export interface Photo {
   storage_path?: string;
   media_type?: 'image' | 'video';
   video_id?: string;
+  taken_at?: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface Memory {
